@@ -1,0 +1,8 @@
+__pycache__/
+*.py[cod]
+server/.pytest_cache/
+server/.ruff_cache/
+server/src/**/__pycache__/
+server/tests/**/__pycache__/
+web/dist/
+web/node_modules/

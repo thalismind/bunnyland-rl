@@ -1,0 +1,207 @@
+from __future__ import annotations
+
+import asyncio
+import sys
+
+import pytest
+from bunnyland.core import (
+    ActionArgument,
+    ActionDefinition,
+    ActionPointsComponent,
+    CharacterComponent,
+    ContainmentMode,
+    Contains,
+    ExitTo,
+    IdentityComponent,
+    RoomComponent,
+    WorldActor,
+    spawn_entity,
+)
+from bunnyland.llm_agents import ControllerDispatch, ScriptedAgent, ToolCall, tool_names
+from bunnyland.plugins import apply_plugins, load_modules
+from bunnyland.prompts.builder import PromptBuilder
+
+from bunnyland_rl.components import RLControllerComponent
+from bunnyland_rl.lenses import encode_lenses
+from bunnyland_rl.policy import (
+    DeepPolicyNet,
+    MLPPolicyNet,
+    ResidualPolicyNet,
+    policy_net_names,
+    register_policy_net,
+    validate_policy_net,
+)
+from bunnyland_rl.training import MIN_ACTION_HEAD_SIZE, RLTrainingService, TrainingConfig
+
+
+def scenario() -> tuple[WorldActor, str]:
+    actor = WorldActor()
+    room_a = spawn_entity(actor.world, [RoomComponent(title="Mosslit Burrow")])
+    room_b = spawn_entity(actor.world, [RoomComponent(title="North Tunnel")])
+    room_a.add_relationship(ExitTo(direction="north"), room_b.id)
+    character = spawn_entity(
+        actor.world,
+        [
+            IdentityComponent(name="Juniper", kind="character"),
+            CharacterComponent(species="bunny"),
+            ActionPointsComponent(current=5.0, maximum=5.0),
+        ],
+    )
+    room_a.add_relationship(Contains(mode=ContainmentMode.ROOM_CONTENT), character.id)
+    return actor, str(character.id)
+
+
+def test_plugin_imports_without_torch_and_contributes_ecs_and_runtime():
+    sys.modules.pop("torch", None)
+    plugins = load_modules(["bunnyland_rl"])
+
+    assert [plugin.id for plugin in plugins] == ["bunnyland_rl.bunnyland_rl"]
+    assert RLControllerComponent in plugins[0].ecs.components
+    assert plugins[0].runtime.controller_factories
+    assert plugins[0].runtime.server_routers
+    assert "torch" not in sys.modules
+
+
+def test_policy_registry_validates_and_accepts_new_policy():
+    assert {"mlp", "deep", "residual"} <= set(policy_net_names())
+    assert MLPPolicyNet.name == "mlp"
+    assert DeepPolicyNet.name == "deep"
+    assert ResidualPolicyNet.name == "residual"
+
+    class TestPolicy:
+        def __init__(self, input_size: int, output_size: int) -> None:
+            self.shape = (input_size, output_size)
+
+    register_policy_net("test", TestPolicy)
+    assert "test" in policy_net_names()
+    with pytest.raises(ValueError, match="unknown policy net"):
+        validate_policy_net("missing")
+
+
+def test_lenses_are_deterministic_and_have_stable_shapes():
+    actor, character_id = scenario()
+    builder = PromptBuilder(actor.world)
+    character_entity = next(
+        iter(actor.world.query().with_all([CharacterComponent]).execute_entities())
+    )
+    character = actor.world.get_entity(character_entity.id)
+    context = builder.build(character.id)
+
+    first = encode_lenses(
+        ("room_text", "perception_text", "stats_vector", "components_vector", "room_grid"),
+        actor.world,
+        character,
+        context,
+    )
+    second = encode_lenses(tuple(output.name for output in first), actor.world, character, context)
+
+    assert first == second
+    assert [output.shape for output in first] == [(64,), (64,), (4,), (6,), (9,)]
+    assert character_id
+
+
+def test_training_job_completes_saves_and_reloads_model(tmp_path):
+    actor, character_id = scenario()
+    service = RLTrainingService(actor, storage_dir=tmp_path)
+    job = service.create_job(
+        TrainingConfig(
+            character_id=character_id,
+            policy_net="mlp",
+            lenses=("room_text", "stats_vector"),
+            episodes=1,
+            updates_per_episode=2,
+            action_size=8,
+        )
+    )
+
+    asyncio.run(service.run_job(job.job_id))
+    completed = service.get_job(job.job_id)
+
+    assert completed is not None
+    assert completed.status == "completed"
+    assert completed.model_id is not None
+    model = service.get_model(completed.model_id)
+    assert model is not None
+    assert model.config.action_size >= MIN_ACTION_HEAD_SIZE
+    assert model.config.output_size == model.config.action_size + model.config.target_size
+    assert model.metrics.reward_curve
+    assert model.metrics.action_histogram
+    assert model.artifact_path
+
+    reloaded = RLTrainingService(actor, storage_dir=tmp_path)
+    assert reloaded.get_model(completed.model_id) is not None
+
+
+def test_assignment_creates_rl_controller_and_bumps_generation(tmp_path):
+    actor, character_id = scenario()
+    service = RLTrainingService(actor, storage_dir=tmp_path)
+    job = service.create_job(
+        TrainingConfig(character_id=character_id, episodes=1, updates_per_episode=1)
+    )
+    asyncio.run(service.run_job(job.job_id))
+    model_id = service.get_job(job.job_id).model_id
+
+    first = service.assign_model(character_id=character_id, model_id=model_id)
+    second = service.assign_model(character_id=character_id, model_id=model_id)
+
+    assert first["generation"] == 0
+    assert second["generation"] == 1
+    controller_entity = next(
+        iter(actor.world.query().with_all([RLControllerComponent]).execute_entities())
+    )
+    controller = actor.world.get_entity(controller_entity.id)
+    assert controller.has_component(RLControllerComponent)
+
+
+def test_rl_dispatch_emits_normal_tool_calls():
+    actor, character_id = scenario()
+    actor.register_action_definition(
+        ActionDefinition(
+            command_type="wait",
+            tool_name="wait",
+            arguments={},
+        )
+    )
+    actor.register_action_definition(
+        ActionDefinition(
+            command_type="move",
+            tool_name="move",
+            arguments={"direction": ActionArgument(required=True)},
+        )
+    )
+    apply_plugins(load_modules(["bunnyland_rl"]), actor)
+    character_entity = next(
+        iter(actor.world.query().with_all([CharacterComponent]).execute_entities())
+    )
+    character = actor.world.get_entity(character_entity.id)
+    controller = spawn_entity(actor.world, [RLControllerComponent(model_id="builtin:untrained")])
+    actor.assign_controller(character.id, controller.id)
+    dispatch = ControllerDispatch(
+        actor,
+        PromptBuilder(actor.world),
+        ScriptedAgent([ToolCall("wait", {})]),
+    )
+
+    decisions = asyncio.run(dispatch.run_once())
+
+    assert decisions
+    assert decisions[0].tool is None or decisions[0].tool in tool_names(actor.action_definitions())
+    assert character_id
+
+
+def test_admin_rl_routes_are_contributed_under_admin(monkeypatch, tmp_path):
+    pytest.importorskip("fastapi")
+
+    from bunnyland.server.app import create_app
+
+    monkeypatch.setenv("BUNNYLAND_RL_DIR", str(tmp_path))
+    actor, character_id = scenario()
+    plugins = load_modules(["bunnyland_rl"])
+    apply_plugins(plugins, actor)
+    app = create_app(actor, plugins=plugins, admin_token="secret")
+
+    paths = {getattr(route, "path", "") for route in app.routes}
+    assert "/admin/rl/status" in paths
+    assert "/admin/rl/training/jobs" in paths
+    assert all(path.startswith("/admin/rl") for path in paths if "/rl/" in path)
+    assert character_id

@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+BUNNYLAND_SERVER_PATH="${BUNNYLAND_SERVER_PATH:-${ROOT}/../bunnyland-server}"
+export UV_CACHE_DIR="${UV_CACHE_DIR:-/tmp/bunnyland-rl-uv-cache}"
+
+if [[ -d "${BUNNYLAND_SERVER_PATH}/src" ]]; then
+  export PYTHONPATH="${ROOT}/server/src:${BUNNYLAND_SERVER_PATH}/src:${PYTHONPATH:-}"
+else
+  export PYTHONPATH="${ROOT}/server/src:${PYTHONPATH:-}"
+fi
+
+if [[ -f "${BUNNYLAND_SERVER_PATH}/pyproject.toml" ]] && command -v uv >/dev/null 2>&1; then
+  uv run --project "${BUNNYLAND_SERVER_PATH}" -m pytest "${ROOT}/server/tests"
+else
+  python3 -m pytest "${ROOT}/server/tests"
+fi

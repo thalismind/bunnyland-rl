@@ -30,23 +30,36 @@ type Model = {
   wandb_url: string | null;
 };
 
+type Character = {
+  character_id: string;
+  name: string;
+  kind: string;
+  suspended: boolean;
+};
+
 type State = {
   apiBase: string;
   adminSecret: string;
+  characters: Character[];
+  behaviors: string[];
   jobs: Job[];
   models: Model[];
   selectedCharacter: string;
-  selectedModel: string;
+  selectedBehavior: string;
+  assignCharacter: string;
   error: string;
 };
 
 const state: State = {
   apiBase: normalizeBase(new URLSearchParams(location.search).get('server') || '/api'),
   adminSecret: localStorage.getItem('bunnyland-admin-secret') || '',
+  characters: [],
+  behaviors: [],
   jobs: [],
   models: [],
   selectedCharacter: '',
-  selectedModel: '',
+  selectedBehavior: 'idle',
+  assignCharacter: '',
   error: '',
 };
 
@@ -70,12 +83,25 @@ async function getJson<T>(path: string): Promise<T> {
 
 async function refresh(): Promise<void> {
   try {
-    const [jobs, models] = await Promise.all([
+    const [characters, definitions, jobs, models] = await Promise.all([
+      getJson<{ characters: Character[] }>('/world/characters'),
+      getJson<{ behaviors: string[] }>('/admin/controllers/definitions'),
       getJson<{ jobs: Job[] }>('/admin/rl/training/jobs'),
       getJson<{ models: Model[] }>('/admin/rl/models'),
     ]);
+    state.characters = characters.characters;
+    state.behaviors = definitions.behaviors;
     state.jobs = jobs.jobs;
     state.models = models.models;
+    if (!state.selectedCharacter && state.characters[0]) {
+      state.selectedCharacter = state.characters[0].character_id;
+    }
+    if (!state.assignCharacter && state.characters[0]) {
+      state.assignCharacter = state.characters[0].character_id;
+    }
+    if (!state.behaviors.includes(state.selectedBehavior) && state.behaviors[0]) {
+      state.selectedBehavior = state.behaviors.includes('idle') ? 'idle' : state.behaviors[0];
+    }
     state.error = '';
   } catch (error) {
     state.error = error instanceof Error ? error.message : String(error);
@@ -84,7 +110,10 @@ async function refresh(): Promise<void> {
 }
 
 async function startJob(): Promise<void> {
-  const characterId = (document.getElementById('character-id') as HTMLInputElement).value.trim();
+  const characterId = (document.getElementById('character-id') as HTMLSelectElement).value;
+  state.selectedCharacter = characterId;
+  const behaviorName = (document.getElementById('behavior-name') as HTMLSelectElement).value;
+  state.selectedBehavior = behaviorName;
   const policyNet = (document.getElementById('policy-net') as HTMLSelectElement).value;
   const lenses = Array.from(document.querySelectorAll<HTMLInputElement>('[data-lens]:checked')).map(
     input => input.value,
@@ -94,6 +123,8 @@ async function startJob(): Promise<void> {
       character_id: characterId,
       policy_net: policyNet,
       lenses,
+      mode: 'behavior_overlay',
+      behavior_name: behaviorName,
       episodes: Number((document.getElementById('episodes') as HTMLInputElement).value || 8),
       updates_per_episode: Number((document.getElementById('updates') as HTMLInputElement).value || 4),
       seed: (document.getElementById('seed') as HTMLInputElement).value,
@@ -114,7 +145,8 @@ async function cancelJob(jobId: string): Promise<void> {
 }
 
 async function assignModel(modelId: string): Promise<void> {
-  const characterId = (document.getElementById('assign-character-id') as HTMLInputElement).value.trim();
+  const characterId = (document.getElementById('assign-character-id') as HTMLSelectElement).value;
+  state.assignCharacter = characterId;
   await sendJson(state.apiBase, `/admin/rl/models/${encodeURIComponent(modelId)}/assign`, {
     body: JSON.stringify({ character_id: characterId }),
     headers: headers(),
@@ -140,7 +172,12 @@ function render(): void {
       </header>
       ${state.error ? `<p class="error">${escapeHtml(state.error)}</p>` : ''}
       <section class="controls">
-        <label>Character <input id="character-id" value="${escapeHtml(state.selectedCharacter)}" /></label>
+        <label>Character
+          ${renderCharacterSelect('character-id', state.selectedCharacter)}
+        </label>
+        <label>Base behavior
+          ${renderBehaviorSelect('behavior-name', state.selectedBehavior)}
+        </label>
         <label>Policy
           <select id="policy-net">
             <option value="mlp">mlp</option>
@@ -159,6 +196,10 @@ function render(): void {
         </fieldset>
         <button id="start-job">Start</button>
       </section>
+      <section class="characters">
+        <h2>Characters</h2>
+        ${renderCharacters(state.characters)}
+      </section>
       <section class="grid">
         <article>
           <h2>Training Jobs</h2>
@@ -166,13 +207,62 @@ function render(): void {
         </article>
         <article>
           <h2>Models</h2>
-          <label>Assign to <input id="assign-character-id" /></label>
+          <label>Assign to
+            ${renderCharacterSelect('assign-character-id', state.assignCharacter)}
+          </label>
           ${renderModels(state.models)}
         </article>
       </section>
     </section>
   `;
   bind();
+}
+
+function renderCharacterSelect(id: string, selected: string): string {
+  if (!state.characters.length) {
+    return `<select id="${id}" disabled><option>No characters loaded</option></select>`;
+  }
+  return `
+    <select id="${id}">
+      ${state.characters.map(character => `
+        <option value="${escapeHtml(character.character_id)}" ${character.character_id === selected ? 'selected' : ''}>
+          ${escapeHtml(character.name)} (${escapeHtml(character.character_id)})
+        </option>
+      `).join('')}
+    </select>
+  `;
+}
+
+function renderBehaviorSelect(id: string, selected: string): string {
+  if (!state.behaviors.length) {
+    return `<select id="${id}" disabled><option>No behaviors loaded</option></select>`;
+  }
+  return `
+    <select id="${id}">
+      ${state.behaviors.map(behavior => `
+        <option value="${escapeHtml(behavior)}" ${behavior === selected ? 'selected' : ''}>
+          ${escapeHtml(behavior)}
+        </option>
+      `).join('')}
+    </select>
+  `;
+}
+
+function renderCharacters(characters: Character[]): string {
+  if (!characters.length) {
+    return '<p class="empty">No characters loaded.</p>';
+  }
+  return `
+    <div class="character-list">
+      ${characters.map(character => `
+        <div class="character-pill">
+          <strong>${escapeHtml(character.name)}</strong>
+          <span>${escapeHtml(character.character_id)}</span>
+          ${character.suspended ? '<em>suspended</em>' : ''}
+        </div>
+      `).join('')}
+    </div>
+  `;
 }
 
 function renderJobs(jobs: Job[]): string {

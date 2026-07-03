@@ -23,6 +23,8 @@ class TrainingJobRequest(BaseModel):
     lenses: list[str] = Field(
         default_factory=lambda: ["room_text", "perception_text", "stats_vector"]
     )
+    mode: str = "behavior_overlay"
+    behavior_name: str = "idle"
     episodes: int = 8
     updates_per_episode: int = 4
     seed: str = ""
@@ -34,7 +36,7 @@ class ModelAssignRequest(BaseModel):
     character_id: str
     policy_net: str | None = None
     lenses: list[str] | None = None
-    mode: str = "standalone"
+    mode: str | None = None
     behavior_name: str | None = None
     act_every_ticks: int = 1
 
@@ -68,6 +70,8 @@ def install_rl_routes(app, actor: WorldActor, **_context) -> None:
                     character_id=request.character_id,
                     policy_net=request.policy_net,
                     lenses=tuple(request.lenses),
+                    mode=request.mode,
+                    behavior_name=request.behavior_name,
                     episodes=request.episodes,
                     updates_per_episode=request.updates_per_episode,
                     seed=request.seed,

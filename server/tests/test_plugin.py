@@ -110,6 +110,7 @@ def test_training_job_completes_saves_and_reloads_model(tmp_path):
             character_id=character_id,
             policy_net="mlp",
             lenses=("room_text", "stats_vector"),
+            behavior_name="wanderer",
             episodes=1,
             updates_per_episode=2,
             action_size=8,
@@ -124,6 +125,8 @@ def test_training_job_completes_saves_and_reloads_model(tmp_path):
     assert completed.model_id is not None
     model = service.get_model(completed.model_id)
     assert model is not None
+    assert model.config.mode == "behavior_overlay"
+    assert model.config.behavior_name == "wanderer"
     assert model.config.action_size >= MIN_ACTION_HEAD_SIZE
     assert model.config.output_size == model.config.action_size + model.config.target_size
     assert model.metrics.reward_curve
@@ -179,7 +182,12 @@ def test_training_job_logs_to_wandb_when_enabled(monkeypatch, tmp_path):
     actor, character_id = scenario()
     service = RLTrainingService(actor, storage_dir=tmp_path)
     job = service.create_job(
-        TrainingConfig(character_id=character_id, episodes=1, updates_per_episode=1)
+        TrainingConfig(
+            character_id=character_id,
+            behavior_name="guard",
+            episodes=1,
+            updates_per_episode=1,
+        )
     )
 
     asyncio.run(service.run_job(job.job_id))
@@ -199,7 +207,12 @@ def test_assignment_creates_rl_controller_and_bumps_generation(tmp_path):
     actor, character_id = scenario()
     service = RLTrainingService(actor, storage_dir=tmp_path)
     job = service.create_job(
-        TrainingConfig(character_id=character_id, episodes=1, updates_per_episode=1)
+        TrainingConfig(
+            character_id=character_id,
+            behavior_name="guard",
+            episodes=1,
+            updates_per_episode=1,
+        )
     )
     asyncio.run(service.run_job(job.job_id))
     model_id = service.get_job(job.job_id).model_id
@@ -214,6 +227,9 @@ def test_assignment_creates_rl_controller_and_bumps_generation(tmp_path):
     )
     controller = actor.world.get_entity(controller_entity.id)
     assert controller.has_component(RLControllerComponent)
+    assigned = controller.get_component(RLControllerComponent)
+    assert assigned.mode == "behavior_overlay"
+    assert assigned.behavior_name == "guard"
 
 
 def test_rl_dispatch_emits_normal_tool_calls():

@@ -30,6 +30,8 @@ class TrainingConfig:
     character_id: str
     policy_net: str = "mlp"
     lenses: tuple[str, ...] = ("room_text", "perception_text", "stats_vector")
+    mode: str = "behavior_overlay"
+    behavior_name: str = "idle"
     episodes: int = 8
     updates_per_episode: int = 4
     seed: str = ""
@@ -146,7 +148,7 @@ class RLTrainingService:
         model_id: str,
         policy_net: str | None = None,
         lenses: tuple[str, ...] | None = None,
-        mode: str = "standalone",
+        mode: str | None = None,
         behavior_name: str | None = None,
         act_every_ticks: int = 1,
     ) -> dict[str, object]:
@@ -156,10 +158,14 @@ class RLTrainingService:
             raise ValueError(f"model {model_id!r} does not exist")
         selected_policy = validate_policy_net(policy_net or model.config.policy_net)
         selected_lenses = tuple(lenses or model.config.lenses)
+        selected_mode = mode or model.config.mode
+        selected_behavior = (
+            behavior_name if behavior_name is not None else model.config.behavior_name
+        )
         _validate_lenses(selected_lenses)
-        if mode not in {"standalone", "behavior_overlay"}:
+        if selected_mode not in {"standalone", "behavior_overlay"}:
             raise ValueError("mode must be standalone or behavior_overlay")
-        if mode == "behavior_overlay" and not behavior_name:
+        if selected_mode == "behavior_overlay" and not selected_behavior:
             raise ValueError("behavior_name is required for behavior_overlay mode")
 
         controller = spawn_entity(
@@ -169,8 +175,8 @@ class RLTrainingService:
                     model_id=model_id,
                     policy_net=selected_policy,
                     lenses=selected_lenses,
-                    mode=mode,  # type: ignore[arg-type]
-                    behavior_name=behavior_name,
+                    mode=selected_mode,  # type: ignore[arg-type]
+                    behavior_name=selected_behavior,
                     act_every_ticks=max(1, int(act_every_ticks)),
                 )
             ],
@@ -270,6 +276,10 @@ class RLTrainingService:
         _character_id(self.actor, config.character_id)
         validate_policy_net(config.policy_net)
         _validate_lenses(config.lenses)
+        if config.mode not in {"standalone", "behavior_overlay"}:
+            raise ValueError("mode must be standalone or behavior_overlay")
+        if config.mode == "behavior_overlay" and not config.behavior_name:
+            raise ValueError("behavior_name is required for behavior_overlay mode")
         live_actions = len(self.actor.action_definitions())
         action_size = max(MIN_ACTION_HEAD_SIZE, live_actions, int(config.action_size))
         target_size = max(MIN_ACTION_HEAD_SIZE, int(config.target_size))
@@ -377,6 +387,8 @@ def _artifact_from_dict(data: dict[str, object], *, artifact_path: str) -> Model
         character_id=str(config_data.get("character_id", "")),
         policy_net=str(config_data.get("policy_net", "mlp")),
         lenses=tuple(config_data.get("lenses", ())),
+        mode=str(config_data.get("mode", "behavior_overlay")),
+        behavior_name=str(config_data.get("behavior_name", "idle")),
         episodes=int(config_data.get("episodes", 1)),
         updates_per_episode=int(config_data.get("updates_per_episode", 1)),
         seed=str(config_data.get("seed", "")),

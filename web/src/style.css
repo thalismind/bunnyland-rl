@@ -42,10 +42,15 @@ h3 {
 }
 
 .controls,
+.characters,
 article {
   border: 1px solid #d6dde3;
   background: #fff;
   padding: 12px;
+}
+
+.characters {
+  margin-top: 12px;
 }
 
 .grid {
@@ -66,6 +71,26 @@ article {
 .row > div {
   min-width: 220px;
   flex: 1 1 220px;
+}
+
+.character-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.character-pill {
+  border: 1px solid #d6dde3;
+  padding: 6px 8px;
+  min-width: 220px;
+}
+
+.character-pill span,
+.character-pill em {
+  display: block;
+  color: #697780;
+  font-size: 12px;
 }
 
 input,

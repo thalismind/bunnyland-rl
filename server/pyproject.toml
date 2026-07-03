@@ -5,7 +5,7 @@ description = "Out-of-tree Bunnyland reinforcement-learning controller and admin
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "bunnyland",
+    "bunnyland>=0.2.0",
     "numpy>=2.0",
     "pydantic>=2.0",
     "relics",

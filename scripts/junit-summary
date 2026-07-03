@@ -1,0 +1,53 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import os
+import sys
+import xml.etree.ElementTree as ET
+from pathlib import Path
+
+
+def suites(path: Path) -> list[ET.Element]:
+    root = ET.parse(path).getroot()
+    if root.tag == "testsuite":
+        return [root]
+    return list(root.findall("testsuite"))
+
+
+def main() -> int:
+    report_dir = Path(sys.argv[1] if len(sys.argv) > 1 else ".reports")
+    rows: list[tuple[str, int, int, int, float]] = []
+    for path in sorted(report_dir.glob("*.xml")):
+        tests = failures = errors = 0
+        elapsed = 0.0
+        for suite in suites(path):
+            tests += int(suite.attrib.get("tests", "0"))
+            failures += int(suite.attrib.get("failures", "0"))
+            errors += int(suite.attrib.get("errors", "0"))
+            elapsed += float(suite.attrib.get("time", "0") or 0)
+        rows.append((path.name, tests, failures, errors, elapsed))
+
+    if not rows:
+        output = "### Test Reports\n\nNo JUnit XML reports were produced.\n"
+    else:
+        lines = [
+            "### Test Reports",
+            "",
+            "| Report | Tests | Failures | Errors | Time |",
+            "| --- | ---: | ---: | ---: | ---: |",
+        ]
+        for name, tests, failures, errors, elapsed in rows:
+            lines.append(f"| {name} | {tests} | {failures} | {errors} | {elapsed:.2f}s |")
+        output = "\n".join(lines) + "\n"
+
+    summary = os.environ.get("GITHUB_STEP_SUMMARY")
+    if summary:
+        with open(summary, "a", encoding="utf-8") as handle:
+            handle.write(output)
+    else:
+        print(output)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -19,7 +19,8 @@ RUN npm run build
 FROM build AS test
 
 COPY web/test ./test
-RUN npm test
+RUN mkdir -p /reports
+CMD ["node", "--test", "--test-reporter=junit", "--test-reporter-destination=/reports/web.xml"]
 
 FROM ${BUNNYLAND_WEB_IMAGE}
 

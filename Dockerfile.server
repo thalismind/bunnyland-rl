@@ -9,15 +9,14 @@ COPY server/pyproject.toml server/README.md ./
 COPY server/src ./src
 
 RUN --mount=type=cache,id=uv-cache,target=/root/.cache/uv,sharing=locked \
-    uv pip install --python /app/.venv/bin/python ".[tracking]"
+    uv add --project /app --editable ".[tracking]"
 
 FROM plugin AS test
 
 COPY server/tests ./tests
+RUN mkdir -p /reports
 
-RUN --mount=type=cache,id=uv-cache,target=/root/.cache/uv,sharing=locked \
-    uv pip install --python /app/.venv/bin/python pytest && \
-    /app/.venv/bin/python -m pytest ./tests
+CMD ["uv", "run", "--project", "/app", "--with", "pytest", "-m", "pytest", "/plugin/bunnyland-rl/tests", "--junitxml=/reports/server.xml"]
 
 FROM plugin AS runtime
 

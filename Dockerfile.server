@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 
 ARG BUNNYLAND_SERVER_IMAGE=ghcr.io/thalismind/bunnyland-server:main
-FROM ${BUNNYLAND_SERVER_IMAGE}
+FROM ${BUNNYLAND_SERVER_IMAGE} AS plugin
 
 WORKDIR /plugin/bunnyland-rl
 
@@ -10,5 +10,15 @@ COPY server/src ./src
 
 RUN --mount=type=cache,id=uv-cache,target=/root/.cache/uv,sharing=locked \
     uv pip install --python /app/.venv/bin/python ".[tracking]"
+
+FROM plugin AS test
+
+COPY server/tests ./tests
+
+RUN --mount=type=cache,id=uv-cache,target=/root/.cache/uv,sharing=locked \
+    uv pip install --python /app/.venv/bin/python pytest && \
+    /app/.venv/bin/python -m pytest ./tests
+
+FROM plugin AS runtime
 
 CMD ["bunnyland", "serve", "--module", "bunnyland_rl", "--generator", "lifesim-demo", "--ticks", "0", "--api-host", "0.0.0.0", "--api-port", "8765", "--save", "/data/worlds/main.json", "--autosave-every", "20"]

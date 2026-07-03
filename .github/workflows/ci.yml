@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  server:
+    name: Server Plugin
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout RL plugin
+        uses: actions/checkout@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build and test server plugin
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.server
+          target: test
+          push: false
+      - name: Build server image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.server
+          target: runtime
+          push: false
+
+  web:
+    name: Web Dashboard
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout RL plugin
+        uses: actions/checkout@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build and test web dashboard
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.web
+          target: test
+          push: false
+          build-contexts: |
+            bunnyland-ui-web=docker-image://ghcr.io/thalismind/bunnyland-ui-web:main
+      - name: Build web image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.web
+          push: false
+          build-contexts: |
+            bunnyland-ui-web=docker-image://ghcr.io/thalismind/bunnyland-ui-web:main

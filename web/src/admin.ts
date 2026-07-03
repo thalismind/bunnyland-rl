@@ -129,8 +129,12 @@ function render(): void {
       <header>
         <h1>RL Admin</h1>
         <div class="connection">
-          <input id="api-base" value="${escapeHtml(state.apiBase)}" aria-label="API base" />
-          <input id="admin-secret" value="${escapeHtml(state.adminSecret)}" type="password" aria-label="Admin secret" />
+          <label>API URL
+            <input id="api-base" value="${escapeHtml(state.apiBase)}" placeholder="/api" />
+          </label>
+          <label>Admin secret
+            <input id="admin-secret" value="${escapeHtml(state.adminSecret)}" type="password" placeholder="demo-admin" />
+          </label>
           <button id="refresh">Refresh</button>
         </div>
       </header>

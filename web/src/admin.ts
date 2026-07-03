@@ -1,4 +1,6 @@
+import '@bunnyland/ui-web/assets/bunnyland-ui.css';
 import { normalizeBase, sendJson } from '@bunnyland/ui-web/api';
+import { bindThemeSelect } from '@bunnyland/ui-web/theme';
 import { escapeHtml } from '@bunnyland/ui-web/widgets';
 import './style.css';
 
@@ -75,6 +77,15 @@ function headers(): Record<string, string> {
   return state.adminSecret ? { 'X-Bunnyland-Admin-Secret': state.adminSecret } : {};
 }
 
+function setApiStatus(text: string, cls: '' | 'ok' | 'err'): void {
+  const status = document.getElementById('api-status');
+  if (!status) {
+    return;
+  }
+  status.textContent = text;
+  status.className = cls;
+}
+
 async function getJson<T>(path: string): Promise<T> {
   const response = await fetch(`${state.apiBase}${path}`, { headers: headers() });
   if (!response.ok) {
@@ -105,8 +116,10 @@ async function refresh(): Promise<void> {
       state.selectedBehavior = state.behaviors.includes('idle') ? 'idle' : state.behaviors[0];
     }
     state.error = '';
+    setApiStatus(`● ${state.characters.length} characters · ${state.jobs.length} jobs`, 'ok');
   } catch (error) {
     state.error = error instanceof Error ? error.message : String(error);
+    setApiStatus('○ Not connected', 'err');
   }
   render();
 }
@@ -159,62 +172,48 @@ async function assignModel(modelId: string): Promise<void> {
 
 function render(): void {
   root.innerHTML = `
-    <section class="shell">
-      <header>
-        <h1>RL Admin</h1>
-        <div class="connection">
-          <label>API URL
-            <input id="api-base" value="${escapeHtml(state.apiBase)}" placeholder="/api" />
-          </label>
-          <label>Admin secret
-            <input id="admin-secret" value="${escapeHtml(state.adminSecret)}" type="password" placeholder="demo-admin" />
-          </label>
-          <button id="refresh">Refresh</button>
-        </div>
-      </header>
-      ${state.error ? `<p class="error">${escapeHtml(state.error)}</p>` : ''}
-      <section class="controls">
-        <label>Character
-          ${renderCharacterSelect('character-id', state.selectedCharacter)}
+    ${state.error ? `<p class="error">${escapeHtml(state.error)}</p>` : ''}
+    <section class="controls">
+      <label>Character
+        ${renderCharacterSelect('character-id', state.selectedCharacter)}
+      </label>
+      <label>Base behavior
+        ${renderBehaviorSelect('behavior-name', state.selectedBehavior)}
+      </label>
+      <label>Policy
+        <select id="policy-net">
+          <option value="mlp">mlp</option>
+          <option value="deep">deep</option>
+          <option value="residual">residual</option>
+        </select>
+      </label>
+      <label>Episodes <input id="episodes" type="number" min="1" value="8" /></label>
+      <label>Updates <input id="updates" type="number" min="1" value="4" /></label>
+      <label>Seed <input id="seed" /></label>
+      <fieldset>
+        <legend>Lenses</legend>
+        ${['room_text', 'perception_text', 'stats_vector', 'components_vector', 'room_grid']
+          .map(lens => `<label><input data-lens type="checkbox" value="${lens}" checked /> ${lens}</label>`)
+          .join('')}
+      </fieldset>
+      <button id="start-job">Start</button>
+    </section>
+    <section class="characters">
+      <h2>Characters</h2>
+      ${renderCharacters(state.characters)}
+    </section>
+    <section class="grid">
+      <article>
+        <h2>Training Jobs</h2>
+        ${renderJobs(state.jobs)}
+      </article>
+      <article>
+        <h2>Models</h2>
+        <label>Assign to
+          ${renderCharacterSelect('assign-character-id', state.assignCharacter)}
         </label>
-        <label>Base behavior
-          ${renderBehaviorSelect('behavior-name', state.selectedBehavior)}
-        </label>
-        <label>Policy
-          <select id="policy-net">
-            <option value="mlp">mlp</option>
-            <option value="deep">deep</option>
-            <option value="residual">residual</option>
-          </select>
-        </label>
-        <label>Episodes <input id="episodes" type="number" min="1" value="8" /></label>
-        <label>Updates <input id="updates" type="number" min="1" value="4" /></label>
-        <label>Seed <input id="seed" /></label>
-        <fieldset>
-          <legend>Lenses</legend>
-          ${['room_text', 'perception_text', 'stats_vector', 'components_vector', 'room_grid']
-            .map(lens => `<label><input data-lens type="checkbox" value="${lens}" checked /> ${lens}</label>`)
-            .join('')}
-        </fieldset>
-        <button id="start-job">Start</button>
-      </section>
-      <section class="characters">
-        <h2>Characters</h2>
-        ${renderCharacters(state.characters)}
-      </section>
-      <section class="grid">
-        <article>
-          <h2>Training Jobs</h2>
-          ${renderJobs(state.jobs)}
-        </article>
-        <article>
-          <h2>Models</h2>
-          <label>Assign to
-            ${renderCharacterSelect('assign-character-id', state.assignCharacter)}
-          </label>
-          ${renderModels(state.models)}
-        </article>
-      </section>
+        ${renderModels(state.models)}
+      </article>
     </section>
   `;
   bind();
@@ -306,13 +305,27 @@ function renderModels(models: Model[]): string {
   `).join('');
 }
 
-function bind(): void {
+// The connection controls and theme selector live in the static #toolbar, so they are
+// wired once at startup rather than on every content re-render.
+function initToolbar(): void {
+  bindThemeSelect(document.getElementById('theme-select') as HTMLSelectElement | null);
+  const apiInput = document.getElementById('api-base') as HTMLInputElement | null;
+  const secretInput = document.getElementById('admin-secret') as HTMLInputElement | null;
+  if (apiInput) {
+    apiInput.value = state.apiBase;
+  }
+  if (secretInput) {
+    secretInput.value = state.adminSecret;
+  }
   document.getElementById('refresh')?.addEventListener('click', () => {
-    state.apiBase = normalizeBase((document.getElementById('api-base') as HTMLInputElement).value);
-    state.adminSecret = (document.getElementById('admin-secret') as HTMLInputElement).value;
+    state.apiBase = normalizeBase(apiInput?.value || '');
+    state.adminSecret = secretInput?.value || '';
     localStorage.setItem('bunnyland-admin-secret', state.adminSecret);
     void refresh();
   });
+}
+
+function bind(): void {
   document.getElementById('start-job')?.addEventListener('click', () => void startJob());
   for (const button of document.querySelectorAll<HTMLButtonElement>('[data-cancel]')) {
     button.addEventListener('click', () => void cancelJob(button.dataset.cancel || ''));
@@ -323,7 +336,13 @@ function bind(): void {
   drawCharts();
 }
 
+function themeColor(name: string, fallback: string): string {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
+}
+
 function drawCharts(): void {
+  const rewardColor = themeColor('--bl-ok', '#2f855a');
+  const lossColor = themeColor('--bl-error', '#c53030');
   for (const job of state.jobs) {
     const canvas = document.querySelector<HTMLCanvasElement>(`canvas[data-chart="${CSS.escape(job.job_id)}"]`);
     const ctx = canvas?.getContext('2d');
@@ -331,8 +350,8 @@ function drawCharts(): void {
       continue;
     }
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    drawLine(ctx, job.metrics.reward_curve, '#2f855a', canvas.width, canvas.height);
-    drawLine(ctx, job.metrics.loss_curve, '#c53030', canvas.width, canvas.height);
+    drawLine(ctx, job.metrics.reward_curve, rewardColor, canvas.width, canvas.height);
+    drawLine(ctx, job.metrics.loss_curve, lossColor, canvas.width, canvas.height);
   }
 }
 
@@ -355,6 +374,7 @@ function drawLine(ctx: CanvasRenderingContext2D, values: number[], color: string
   ctx.stroke();
 }
 
+initToolbar();
 render();
 void refresh();
 setInterval(refresh, 5000);

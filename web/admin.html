@@ -6,6 +6,21 @@
     <title>Bunnyland RL Admin</title>
   </head>
   <body>
+    <div id="toolbar">
+      <div class="toolbar-row">
+        <span class="toolbar-brand">🐰 Bunnyland RL Admin</span>
+        <span class="toolbar-sep">|</span>
+        <label for="api-base">Server</label>
+        <input type="text" id="api-base" spellcheck="false" placeholder="/api" />
+        <label for="admin-secret">Admin secret</label>
+        <input type="password" id="admin-secret" placeholder="demo-admin" />
+        <button id="refresh" type="button">Refresh</button>
+        <span id="api-status">○ Not connected</span>
+        <span class="toolbar-sep">|</span>
+        <label for="theme-select">Theme</label>
+        <select id="theme-select"></select>
+      </div>
+    </div>
     <main id="app"></main>
     <script type="module" src="/src/admin.ts"></script>
   </body>

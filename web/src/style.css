@@ -1,61 +1,105 @@
-:root {
-  color: #1f2933;
-  background: #f5f7f8;
-  font: 14px/1.4 system-ui, sans-serif;
+/* RL admin layout on top of the shared @bunnyland/ui-web base style. Colors, fonts,
+   spacing, and control styling all come from the --bl-* tokens in bunnyland-ui.css. */
+
+#toolbar label {
+  font-size: var(--bl-text-sm);
 }
 
-body {
-  margin: 0;
+#api-base {
+  width: 140px;
 }
 
-.shell {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 24px;
+#admin-secret {
+  width: 130px;
 }
 
-header,
-.connection,
-.controls,
-.grid,
-.row {
+#app {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px;
   display: flex;
-  gap: 12px;
+  flex-direction: column;
+  gap: 14px;
 }
 
-header {
-  align-items: center;
-  justify-content: space-between;
+.error {
+  color: var(--bl-error);
+  font-size: var(--bl-text-sm);
 }
 
-h1,
+.empty {
+  color: var(--bl-text-muted);
+  font-size: var(--bl-text-sm);
+}
+
 h2,
 h3 {
-  margin: 0;
+  color: var(--bl-accent-strong);
 }
 
-.connection,
-.controls,
-.row {
-  align-items: center;
-  flex-wrap: wrap;
+h2 {
+  font-size: var(--bl-text-md);
+  margin-bottom: 8px;
 }
 
+h3 {
+  font-size: var(--bl-text-sm);
+}
+
+/* Panels ─ repeated card/record surfaces drawn from the shared surface tokens. */
 .controls,
 .characters,
 article {
-  border: 1px solid #d6dde3;
-  background: #fff;
+  border: 1px solid var(--bl-border);
+  border-radius: var(--bl-radius-md);
+  background: var(--bl-bg-strong);
   padding: 12px;
 }
 
-.characters {
-  margin-top: 12px;
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.controls > label {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: var(--bl-text-sm);
+  color: var(--bl-text-soft);
+}
+
+.controls fieldset {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--bl-border-control);
+  border-radius: var(--bl-radius-sm);
+  padding: 6px 8px;
+}
+
+.controls legend {
+  padding: 0 4px;
+  font-size: var(--bl-text-xs);
+  color: var(--bl-text-muted);
+}
+
+.controls fieldset label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--bl-text-sm);
+  color: var(--bl-text-soft);
 }
 
 .grid {
+  display: flex;
   align-items: flex-start;
-  margin-top: 16px;
+  gap: 14px;
 }
 
 article {
@@ -64,8 +108,16 @@ article {
 }
 
 .row {
-  border-top: 1px solid #e4e8eb;
-  padding: 12px 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  border-top: 1px solid var(--bl-border-muted);
+  padding: 10px 0;
+}
+
+.row:first-of-type {
+  border-top: none;
 }
 
 .row > div {
@@ -81,7 +133,9 @@ article {
 }
 
 .character-pill {
-  border: 1px solid #d6dde3;
+  border: 1px solid var(--bl-border-control);
+  border-radius: var(--bl-radius-sm);
+  background: var(--bl-surface);
   padding: 6px 8px;
   min-width: 220px;
 }
@@ -89,33 +143,28 @@ article {
 .character-pill span,
 .character-pill em {
   display: block;
-  color: #697780;
-  font-size: 12px;
+  color: var(--bl-text-muted);
+  font-size: var(--bl-text-xs);
 }
 
-input,
-select,
-button {
-  min-height: 32px;
-}
-
-button {
-  border: 1px solid #4b7d88;
-  background: #e8f4f6;
-  color: #183940;
+canvas {
+  border: 1px solid var(--bl-border-muted);
+  border-radius: var(--bl-radius-sm);
+  background: var(--bl-bg-deep);
 }
 
 pre {
   max-width: 220px;
   overflow: auto;
   margin: 0;
-  font-size: 12px;
+  padding: 6px 8px;
+  border: 1px solid var(--bl-border-muted);
+  border-radius: var(--bl-radius-sm);
+  background: var(--bl-bg-deep);
+  color: var(--bl-text-soft);
+  font-size: var(--bl-text-xs);
 }
 
-.error {
-  color: #9b1c1c;
-}
-
-.empty {
-  color: #697780;
+a {
+  color: var(--bl-accent);
 }

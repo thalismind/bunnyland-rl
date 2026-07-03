@@ -12,6 +12,7 @@ from .components import RLControllerComponent
 from .lenses import LENSES
 from .policy import policy_net_names
 from .training import RLTrainingService, TrainingConfig
+from .wandb_tracking import wandb_enabled
 
 SERVICE_ATTR = "_bunnyland_rl_training_service"
 
@@ -56,6 +57,7 @@ def install_rl_routes(app, actor: WorldActor, **_context) -> None:
             "lenses": list(LENSES),
             "models": [_model_view(model) for model in service.list_models()],
             "controller_component": RLControllerComponent.__name__,
+            "wandb_enabled": wandb_enabled(),
         }
 
     @app.post("/admin/rl/training/jobs")

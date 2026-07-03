@@ -18,6 +18,7 @@ from .components import RLControllerComponent
 from .encode import stable_score
 from .lenses import LENSES
 from .policy import validate_policy_net
+from .wandb_tracking import WandbTracker
 
 RL_DIR_ENV = "BUNNYLAND_RL_DIR"
 DEFAULT_RL_DIR = "data/rl"
@@ -84,6 +85,7 @@ class RLTrainingService:
         self.jobs: dict[str, TrainingJob] = {}
         self.models: dict[str, ModelArtifact] = {}
         self._tasks: dict[str, asyncio.Task[None]] = {}
+        self._wandb = WandbTracker()
         self._load_models()
 
     def create_job(self, config: TrainingConfig) -> TrainingJob:
@@ -183,17 +185,29 @@ class RLTrainingService:
 
     async def run_job(self, job_id: str) -> None:
         job = self.jobs[job_id]
-        self.jobs[job_id] = replace(job, status="running", updated_at_unix=time.time())
+        running = replace(job, status="running", updated_at_unix=time.time())
+        self.jobs[job_id] = running
         try:
+            run_info = self._wandb.start_job(running)
+            if run_info.run_id or run_info.url:
+                running = replace(
+                    self.jobs[job_id],
+                    wandb_run_id=run_info.run_id,
+                    wandb_url=run_info.url,
+                    updated_at_unix=time.time(),
+                )
+                self.jobs[job_id] = running
             await self._simulate_training(job_id)
         except Exception as exc:  # noqa: BLE001 - job errors are reported in status
             current = self.jobs[job_id]
-            self.jobs[job_id] = replace(
+            failed = replace(
                 current,
                 status="failed",
                 error=str(exc),
                 updated_at_unix=time.time(),
             )
+            self.jobs[job_id] = failed
+            self._wandb.finish_job(failed, status="failed")
 
     async def _simulate_training(self, job_id: str) -> None:
         job = self.jobs[job_id]
@@ -206,11 +220,13 @@ class RLTrainingService:
             for update in range(1, job.config.updates_per_episode + 1):
                 current = self.jobs[job_id]
                 if current.cancel_requested:
-                    self.jobs[job_id] = replace(
+                    cancelled = replace(
                         current,
                         status="cancelled",
                         updated_at_unix=time.time(),
                     )
+                    self.jobs[job_id] = cancelled
+                    self._wandb.finish_job(cancelled, status="cancelled")
                     return
                 progress = ((episode - 1) * job.config.updates_per_episode + update) / total_updates
                 reward_curve.append(round(progress * 10.0, 4))
@@ -219,7 +235,7 @@ class RLTrainingService:
                 histogram[action] = histogram.get(action, 0) + 1
                 trust = _updated_trust(job.config.lenses, progress)
                 checkpoint = self._write_checkpoint(job_id, episode, update)
-                self.jobs[job_id] = replace(
+                updated = replace(
                     current,
                     status="running",
                     updated_at_unix=time.time(),
@@ -233,10 +249,13 @@ class RLTrainingService:
                         trust_weights=trust,
                     ),
                 )
+                self.jobs[job_id] = updated
+                self._wandb.log_metrics(updated, checkpoint_path=str(checkpoint))
                 await asyncio.sleep(0)
         completed = self.jobs[job_id]
         artifact = self._save_model(completed)
         self.models[artifact.model_id] = artifact
+        self._wandb.finish_model(completed, artifact)
         self.jobs[job_id] = replace(
             completed,
             status="completed",
@@ -282,8 +301,8 @@ class RLTrainingService:
             metrics=job.metrics,
             checkpoint_path=checkpoint_path,
             artifact_path=str(artifact_path),
-            wandb_run_id=None,
-            wandb_url=None,
+            wandb_run_id=job.wandb_run_id,
+            wandb_url=job.wandb_url,
         )
         artifact_path.write_text(
             json.dumps(_artifact_dict(artifact), indent=2, sort_keys=True),

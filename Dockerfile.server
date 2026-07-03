@@ -9,6 +9,6 @@ COPY server/pyproject.toml server/README.md ./
 COPY server/src ./src
 
 RUN --mount=type=cache,id=uv-cache,target=/root/.cache/uv,sharing=locked \
-    uv pip install --python /app/.venv/bin/python ".[rl]"
+    uv pip install --python /app/.venv/bin/python ".[rl,tracking]"
 
 CMD ["bunnyland", "serve", "--module", "bunnyland_rl", "--generator", "lifesim-demo", "--ticks", "0", "--api-host", "0.0.0.0", "--api-port", "8765", "--save", "/data/worlds/main.json", "--autosave-every", "20"]

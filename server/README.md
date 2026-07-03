@@ -10,6 +10,10 @@ Training jobs are offline arena jobs seeded from the live world state. They do n
 live-world commands. Completed jobs save model metadata/artifacts to `BUNNYLAND_RL_DIR`
 (default: `data/rl`) and models are reloadable after server restart.
 
+W&B tracking is optional and lazy. Set `BUNNYLAND_RL_WANDB=1` or configure `WANDB_API_KEY`
+/ `WANDB_MODE=offline`; jobs then log metrics, checkpoint paths, lens trust weights, action
+histograms, and saved model artifacts. Install the `tracking` extra to include `wandb`.
+
 Run with:
 
 ```bash

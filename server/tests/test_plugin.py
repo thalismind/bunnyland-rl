@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import sys
+from types import SimpleNamespace
 
 import pytest
 from bunnyland.core import (
@@ -32,6 +33,7 @@ from bunnyland_rl.policy import (
     validate_policy_net,
 )
 from bunnyland_rl.training import MIN_ACTION_HEAD_SIZE, RLTrainingService, TrainingConfig
+from bunnyland_rl.wandb_tracking import WANDB_ENABLED_ENV
 
 
 def scenario() -> tuple[WorldActor, str]:
@@ -130,6 +132,67 @@ def test_training_job_completes_saves_and_reloads_model(tmp_path):
 
     reloaded = RLTrainingService(actor, storage_dir=tmp_path)
     assert reloaded.get_model(completed.model_id) is not None
+
+
+def test_training_job_logs_to_wandb_when_enabled(monkeypatch, tmp_path):
+    runs = []
+    artifacts = []
+
+    class FakeRun:
+        id = "run-123"
+        url = "https://wandb.test/run-123"
+
+        def __init__(self) -> None:
+            self.logs = []
+            self.finished = False
+
+        def log(self, payload, step=None) -> None:
+            self.logs.append((payload, step))
+
+        def log_artifact(self, artifact) -> None:
+            artifacts.append(artifact)
+
+        def finish(self, exit_code=0) -> None:
+            self.finished = exit_code == 0
+
+    class FakeArtifact:
+        def __init__(self, name, type) -> None:
+            self.name = name
+            self.type = type
+            self.files = []
+
+        def add_file(self, path) -> None:
+            self.files.append(path)
+
+    def fake_init(**kwargs):
+        run = FakeRun()
+        run.kwargs = kwargs
+        runs.append(run)
+        return run
+
+    monkeypatch.setenv(WANDB_ENABLED_ENV, "1")
+    monkeypatch.setitem(
+        sys.modules,
+        "wandb",
+        SimpleNamespace(init=fake_init, Artifact=FakeArtifact),
+    )
+    actor, character_id = scenario()
+    service = RLTrainingService(actor, storage_dir=tmp_path)
+    job = service.create_job(
+        TrainingConfig(character_id=character_id, episodes=1, updates_per_episode=1)
+    )
+
+    asyncio.run(service.run_job(job.job_id))
+    completed = service.get_job(job.job_id)
+    model = service.get_model(completed.model_id)
+
+    assert completed.wandb_run_id == "run-123"
+    assert completed.wandb_url == "https://wandb.test/run-123"
+    assert model.wandb_run_id == "run-123"
+    assert runs[0].kwargs["project"] == "bunnyland-rl"
+    assert any("train/reward" in payload for payload, _step in runs[0].logs)
+    assert artifacts and artifacts[0].files
+    assert runs[0].finished
 
 
 def test_assignment_creates_rl_controller_and_bumps_generation(tmp_path):

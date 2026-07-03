@@ -181,6 +181,7 @@ function renderJobs(jobs: Job[]): string {
         <h3>${escapeHtml(job.job_id)}</h3>
         <p>${escapeHtml(job.status)} · episode ${job.metrics.episode} update ${job.metrics.update}</p>
         <p>checkpoint: ${escapeHtml(job.latest_checkpoint || '')}</p>
+        ${job.wandb_url ? `<p><a href="${escapeHtml(job.wandb_url)}">W&amp;B run</a></p>` : ''}
         ${job.error ? `<p class="error">${escapeHtml(job.error)}</p>` : ''}
       </div>
       <canvas data-chart="${escapeHtml(job.job_id)}" width="220" height="80"></canvas>
@@ -201,6 +202,7 @@ function renderModels(models: Model[]): string {
         <h3>${escapeHtml(model.model_id)}</h3>
         <p>artifact: ${escapeHtml(model.artifact_path)}</p>
         <p>checkpoint: ${escapeHtml(model.checkpoint_path)}</p>
+        ${model.wandb_url ? `<p><a href="${escapeHtml(model.wandb_url)}">W&amp;B run</a></p>` : ''}
       </div>
       <button data-assign="${escapeHtml(model.model_id)}">Assign</button>
     </section>

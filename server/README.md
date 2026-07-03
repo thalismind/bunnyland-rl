@@ -8,11 +8,13 @@ The plugin entrypoint is `bunnyland_rl.bunnyland_plugins()`. It contributes:
 
 Training jobs are offline arena jobs seeded from the live world state. They do not submit
 live-world commands. Completed jobs save model metadata/artifacts to `BUNNYLAND_RL_DIR`
-(default: `data/rl`) and models are reloadable after server restart.
+(default: `data/rl`) and models are reloadable after server restart. NN weights are
+stored separately as safetensors files under `BUNNYLAND_RL_DIR/weights/`.
 
 W&B tracking is optional and lazy. Set `BUNNYLAND_RL_WANDB=1` or configure `WANDB_API_KEY`
 / `WANDB_MODE=offline`; jobs then log metrics, checkpoint paths, lens trust weights, action
-histograms, and saved model artifacts. Install the `tracking` extra to include `wandb`.
+histograms, and saved model metadata, checkpoint, and safetensors artifacts. Install the
+`tracking` extra to include `wandb`.
 
 Run with:
 

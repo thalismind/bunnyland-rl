@@ -21,6 +21,7 @@ from bunnyland.core import (
 from bunnyland.llm_agents import ControllerDispatch, ScriptedAgent, ToolCall, tool_names
 from bunnyland.plugins import apply_plugins, load_modules
 from bunnyland.prompts.builder import PromptBuilder
+from safetensors.torch import load_file
 
 from bunnyland_rl.components import RLControllerComponent
 from bunnyland_rl.lenses import encode_lenses
@@ -53,15 +54,13 @@ def scenario() -> tuple[WorldActor, str]:
     return actor, str(character.id)
 
 
-def test_plugin_imports_without_torch_and_contributes_ecs_and_runtime():
-    sys.modules.pop("torch", None)
+def test_plugin_imports_and_contributes_ecs_and_runtime():
     plugins = load_modules(["bunnyland_rl"])
 
     assert [plugin.id for plugin in plugins] == ["bunnyland_rl.bunnyland_rl"]
     assert RLControllerComponent in plugins[0].ecs.components
     assert plugins[0].runtime.controller_factories
     assert plugins[0].runtime.server_routers
-    assert "torch" not in sys.modules
 
 
 def test_policy_registry_validates_and_accepts_new_policy():
@@ -132,9 +131,16 @@ def test_training_job_completes_saves_and_reloads_model(tmp_path):
     assert model.metrics.reward_curve
     assert model.metrics.action_histogram
     assert model.artifact_path
+    assert model.weights_path
+    assert model.weights_format == "safetensors"
+    weights = load_file(model.weights_path)
+    assert weights
+    assert model.weights_path.endswith(".safetensors")
 
     reloaded = RLTrainingService(actor, storage_dir=tmp_path)
-    assert reloaded.get_model(completed.model_id) is not None
+    reloaded_model = reloaded.get_model(completed.model_id)
+    assert reloaded_model is not None
+    assert reloaded_model.weights_path == model.weights_path
 
 
 def test_training_job_logs_to_wandb_when_enabled(monkeypatch, tmp_path):
@@ -200,6 +206,7 @@ def test_training_job_logs_to_wandb_when_enabled(monkeypatch, tmp_path):
     assert runs[0].kwargs["project"] == "bunnyland-rl"
     assert any("train/reward" in payload for payload, _step in runs[0].logs)
     assert artifacts and artifacts[0].files
+    assert any(path == model.weights_path for path in artifacts[0].files)
     assert runs[0].finished
 
 

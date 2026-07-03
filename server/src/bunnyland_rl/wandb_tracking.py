@@ -75,6 +75,8 @@ class WandbTracker:
                 "model/id": artifact.model_id,
                 "model/artifact_path": artifact.artifact_path,
                 "model/checkpoint_path": artifact.checkpoint_path,
+                "model/weights_path": artifact.weights_path,
+                "model/weights_format": artifact.weights_format,
             },
             step=max(0, len(artifact.metrics.reward_curve)),
         )
@@ -96,9 +98,12 @@ class WandbTracker:
             wandb = _wandb()
             model_artifact = wandb.Artifact(artifact.model_id, type="bunnyland-rl-model")
             artifact_path = Path(artifact.artifact_path)
+            weights_path = Path(artifact.weights_path) if artifact.weights_path else None
             checkpoint_path = Path(artifact.checkpoint_path) if artifact.checkpoint_path else None
             if artifact_path.exists():
                 model_artifact.add_file(str(artifact_path))
+            if weights_path is not None and weights_path.exists():
+                model_artifact.add_file(str(weights_path))
             if checkpoint_path is not None and checkpoint_path.exists():
                 model_artifact.add_file(str(checkpoint_path))
             run.log_artifact(model_artifact)

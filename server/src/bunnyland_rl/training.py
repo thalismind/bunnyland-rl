@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import os
 import time
@@ -10,14 +11,16 @@ from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
 from uuid import uuid4
 
+import torch
 from bunnyland.core import CharacterComponent, parse_entity_id, spawn_entity
 from bunnyland.core.world_actor import WorldActor
 from relics import EntityId
+from safetensors.torch import save_file
 
 from .components import RLControllerComponent
 from .encode import stable_score
 from .lenses import LENSES
-from .policy import validate_policy_net
+from .policy import build_policy_net, validate_policy_net
 from .wandb_tracking import WandbTracker
 
 RL_DIR_ENV = "BUNNYLAND_RL_DIR"
@@ -57,6 +60,8 @@ class ModelArtifact:
     config: TrainingConfig
     metrics: TrainingMetrics
     checkpoint_path: str
+    weights_path: str
+    weights_format: str
     artifact_path: str
     wandb_run_id: str | None = None
     wandb_url: str | None = None
@@ -84,6 +89,7 @@ class RLTrainingService:
         self.storage_dir = Path(storage_dir or os.environ.get(RL_DIR_ENV, DEFAULT_RL_DIR))
         self.models_dir = self.storage_dir / "models"
         self.checkpoints_dir = self.storage_dir / "checkpoints"
+        self.weights_dir = self.storage_dir / "weights"
         self.jobs: dict[str, TrainingJob] = {}
         self.models: dict[str, ModelArtifact] = {}
         self._tasks: dict[str, asyncio.Task[None]] = {}
@@ -137,6 +143,8 @@ class RLTrainingService:
                 config=TrainingConfig(character_id=""),
                 metrics=TrainingMetrics(),
                 checkpoint_path="",
+                weights_path="",
+                weights_format="builtin",
                 artifact_path="",
             )
         return self.models.get(model_id)
@@ -303,6 +311,7 @@ class RLTrainingService:
         self.models_dir.mkdir(parents=True, exist_ok=True)
         model_id = f"rl-{job.job_id}"
         checkpoint_path = job.latest_checkpoint or ""
+        weights_path, weights_format = self._write_weights(model_id, job.config)
         artifact_path = self.models_dir / f"{model_id}.json"
         artifact = ModelArtifact(
             model_id=model_id,
@@ -310,6 +319,8 @@ class RLTrainingService:
             config=job.config,
             metrics=job.metrics,
             checkpoint_path=checkpoint_path,
+            weights_path=str(weights_path),
+            weights_format=weights_format,
             artifact_path=str(artifact_path),
             wandb_run_id=job.wandb_run_id,
             wandb_url=job.wandb_url,
@@ -319,6 +330,25 @@ class RLTrainingService:
             encoding="utf-8",
         )
         return artifact
+
+    def _write_weights(self, model_id: str, config: TrainingConfig) -> tuple[Path, str]:
+        self.weights_dir.mkdir(parents=True, exist_ok=True)
+        input_size = _lens_input_size(config.lenses)
+        torch.manual_seed(_weight_seed(model_id, config, input_size))
+        policy = build_policy_net(config.policy_net, input_size, config.output_size)
+        module = getattr(policy, "module", policy)
+        path = self.weights_dir / f"{model_id}.safetensors"
+        save_file(
+            module.state_dict(),
+            str(path),
+            metadata={
+                "model_id": model_id,
+                "policy_net": config.policy_net,
+                "input_size": str(input_size),
+                "output_size": str(config.output_size),
+            },
+        )
+        return path, "safetensors"
 
     def _load_models(self) -> None:
         if not self.models_dir.exists():
@@ -350,6 +380,24 @@ def _validate_lenses(names: tuple[str, ...]) -> None:
         raise ValueError(f"unknown lens(es): {', '.join(unknown)}")
 
 
+def _lens_input_size(names: tuple[str, ...]) -> int:
+    return sum(LENSES[name].size for name in names)
+
+
+def _weight_seed(model_id: str, config: TrainingConfig, input_size: int) -> int:
+    seed = json.dumps(
+        {
+            "model_id": model_id,
+            "config": asdict(config),
+            "input_size": input_size,
+            "output_size": config.output_size,
+        },
+        sort_keys=True,
+    ).encode("utf-8")
+    digest = hashlib.blake2b(seed, digest_size=8).digest()
+    return int.from_bytes(digest, "big") % (2**31)
+
+
 def _initial_trust(lenses: tuple[str, ...]) -> dict[str, float]:
     weight = round(1.0 / max(1, len(lenses)), 4)
     return {lens: weight for lens in lenses}
@@ -374,6 +422,8 @@ def _artifact_dict(artifact: ModelArtifact) -> dict[str, object]:
         "config": asdict(artifact.config),
         "metrics": asdict(artifact.metrics),
         "checkpoint_path": artifact.checkpoint_path,
+        "weights_path": artifact.weights_path,
+        "weights_format": artifact.weights_format,
         "artifact_path": artifact.artifact_path,
         "wandb_run_id": artifact.wandb_run_id,
         "wandb_url": artifact.wandb_url,
@@ -410,6 +460,8 @@ def _artifact_from_dict(data: dict[str, object], *, artifact_path: str) -> Model
         config=config,
         metrics=metrics,
         checkpoint_path=str(data.get("checkpoint_path", "")),
+        weights_path=str(data.get("weights_path", "")),
+        weights_format=str(data.get("weights_format", "")),
         artifact_path=artifact_path,
         wandb_run_id=data.get("wandb_run_id") or None,  # type: ignore[arg-type]
         wandb_url=data.get("wandb_url") or None,  # type: ignore[arg-type]

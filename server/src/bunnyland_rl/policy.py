@@ -1,26 +1,20 @@
-"""Policy-net registry with optional lazy RL dependencies."""
+"""Policy-net registry for RL controller networks."""
 
 from __future__ import annotations
 
 from collections.abc import Callable
+
+import torch
 
 from .components import PolicyNetName
 
 PolicyNetFactory = Callable[[int, int], object]
 POLICY_NETS: dict[str, PolicyNetFactory] = {}
 
-
-def _torch():
-    import torch
-
-    return torch
-
-
 class MLPPolicyNet:
     name = "mlp"
 
     def __init__(self, input_size: int, output_size: int, *, hidden: int = 64) -> None:
-        torch = _torch()
         self.module = torch.nn.Sequential(
             torch.nn.Linear(input_size, hidden),
             torch.nn.ReLU(),
@@ -35,7 +29,6 @@ class DeepPolicyNet:
     name = "deep"
 
     def __init__(self, input_size: int, output_size: int, *, hidden: int = 128) -> None:
-        torch = _torch()
         self.module = torch.nn.Sequential(
             torch.nn.Linear(input_size, hidden),
             torch.nn.ReLU(),
@@ -52,8 +45,6 @@ class ResidualPolicyNet:
     name = "residual"
 
     def __init__(self, input_size: int, output_size: int, *, hidden: int = 128) -> None:
-        torch = _torch()
-
         class _Residual(torch.nn.Module):
             def __init__(self) -> None:
                 super().__init__()

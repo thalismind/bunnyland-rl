@@ -26,6 +26,8 @@ type Model = {
   config: Record<string, unknown>;
   metrics: Job['metrics'];
   checkpoint_path: string;
+  weights_path: string;
+  weights_format: string;
   artifact_path: string;
   wandb_url: string | null;
 };
@@ -296,6 +298,7 @@ function renderModels(models: Model[]): string {
         <h3>${escapeHtml(model.model_id)}</h3>
         <p>artifact: ${escapeHtml(model.artifact_path)}</p>
         <p>checkpoint: ${escapeHtml(model.checkpoint_path)}</p>
+        <p>weights: ${escapeHtml(model.weights_path)} (${escapeHtml(model.weights_format)})</p>
         ${model.wandb_url ? `<p><a href="${escapeHtml(model.wandb_url)}">W&amp;B run</a></p>` : ''}
       </div>
       <button data-assign="${escapeHtml(model.model_id)}">Assign</button>

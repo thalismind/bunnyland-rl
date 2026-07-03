@@ -163,6 +163,8 @@ def _model_view(model) -> dict[str, Any]:
         "config": asdict(model.config),
         "metrics": asdict(model.metrics),
         "checkpoint_path": model.checkpoint_path,
+        "weights_path": model.weights_path,
+        "weights_format": model.weights_format,
         "artifact_path": model.artifact_path,
         "wandb_run_id": model.wandb_run_id,
         "wandb_url": model.wandb_url,

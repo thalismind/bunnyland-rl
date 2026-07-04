@@ -125,6 +125,81 @@ article {
   flex: 1 1 220px;
 }
 
+.model-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.weight-preview {
+  border-top: 1px solid var(--bl-border-muted);
+  margin-top: 12px;
+  padding-top: 12px;
+}
+
+.preview-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.preview-header p {
+  margin: 2px 0 0;
+  color: var(--bl-text-muted);
+  font-size: var(--bl-text-xs);
+}
+
+.preview-header label {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: min(420px, 100%);
+  color: var(--bl-text-soft);
+  font-size: var(--bl-text-sm);
+}
+
+.layer-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0 8px;
+}
+
+.layer-meta span {
+  border: 1px solid var(--bl-border-muted);
+  border-radius: var(--bl-radius-sm);
+  padding: 3px 6px;
+  background: var(--bl-bg-deep);
+  color: var(--bl-text-soft);
+  font-size: var(--bl-text-xs);
+}
+
+.heatmap-scroll {
+  max-width: 100%;
+  max-height: 540px;
+  overflow: auto;
+  border: 1px solid var(--bl-border-muted);
+  border-radius: var(--bl-radius-sm);
+  background: var(--bl-bg-deep);
+}
+
+.heatmap-canvas {
+  display: block;
+  width: max(100%, calc(var(--heatmap-columns, 512) * 1px));
+  height: auto;
+  min-height: 80px;
+  border: none;
+  border-radius: 0;
+  image-rendering: pixelated;
+}
+
+.heatmap-readout {
+  margin: 6px 0 0;
+  color: var(--bl-text-muted);
+  font-size: var(--bl-text-xs);
+}
+
 .character-list {
   display: flex;
   flex-wrap: wrap;

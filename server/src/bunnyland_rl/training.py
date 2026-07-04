@@ -15,6 +15,7 @@ import torch
 from bunnyland.core import CharacterComponent, parse_entity_id, spawn_entity
 from bunnyland.core.world_actor import WorldActor
 from relics import EntityId
+from safetensors import safe_open
 from safetensors.torch import save_file
 
 from .components import RLControllerComponent
@@ -148,6 +149,44 @@ class RLTrainingService:
                 artifact_path="",
             )
         return self.models.get(model_id)
+
+    def preview_model_weights(
+        self,
+        model_id: str,
+        *,
+        layer_name: str | None = None,
+        max_rows: int = 256,
+        max_columns: int = 256,
+    ) -> dict[str, object]:
+        model = self.get_model(model_id)
+        if model is None:
+            raise ValueError(f"model {model_id!r} does not exist")
+        if model.weights_format != "safetensors" or not model.weights_path:
+            raise ValueError("model does not have safetensors weights")
+        weights_path = Path(model.weights_path)
+        if not weights_path.exists():
+            raise ValueError("model weights file does not exist")
+
+        with safe_open(str(weights_path), framework="pt", device="cpu") as tensors:
+            names = list(tensors.keys())
+            layers = [_layer_summary(name, tensors.get_tensor(name)) for name in names]
+            if not names:
+                return {"model_id": model_id, "layers": [], "selected_layer": None}
+            selected = layer_name or names[0]
+            if selected not in names:
+                raise ValueError(f"layer {selected!r} does not exist")
+            tensor = tensors.get_tensor(selected)
+
+        return {
+            "model_id": model_id,
+            "layers": layers,
+            "selected_layer": _layer_preview(
+                selected,
+                tensor,
+                max_rows=max_rows,
+                max_columns=max_columns,
+            ),
+        }
 
     def assign_model(
         self,
@@ -413,6 +452,68 @@ def _sample_action(seed: str, episode: int, update: int) -> str:
     actions = ("move", "take", "say", "wait")
     index = int(stable_score(seed, episode, update) * len(actions)) % len(actions)
     return actions[index]
+
+
+def _layer_summary(name: str, tensor: torch.Tensor) -> dict[str, object]:
+    return {
+        "name": name,
+        "shape": list(tensor.shape),
+        "dtype": str(tensor.dtype).replace("torch.", ""),
+        "size": int(tensor.numel()),
+    }
+
+
+def _layer_preview(
+    name: str,
+    tensor: torch.Tensor,
+    *,
+    max_rows: int,
+    max_columns: int,
+) -> dict[str, object]:
+    matrix = _as_matrix(tensor.detach().cpu())
+    row_count = int(matrix.shape[0])
+    column_count = int(matrix.shape[1])
+    row_indices = _sample_indices(row_count, max_rows)
+    column_indices = _sample_indices(column_count, max_columns)
+    sampled = matrix[row_indices][:, column_indices].to(torch.float32)
+    values = [
+        [round(float(value), 6) for value in row]
+        for row in sampled.tolist()
+    ]
+    stats_tensor = matrix.to(torch.float32)
+    return {
+        "name": name,
+        "shape": list(tensor.shape),
+        "dtype": str(tensor.dtype).replace("torch.", ""),
+        "rows": row_count,
+        "columns": column_count,
+        "row_indices": row_indices,
+        "column_indices": column_indices,
+        "values": values,
+        "min": round(float(stats_tensor.min()), 6) if stats_tensor.numel() else 0.0,
+        "max": round(float(stats_tensor.max()), 6) if stats_tensor.numel() else 0.0,
+        "mean": round(float(stats_tensor.mean()), 6) if stats_tensor.numel() else 0.0,
+        "downsampled": row_count > len(row_indices) or column_count > len(column_indices),
+    }
+
+
+def _as_matrix(tensor: torch.Tensor) -> torch.Tensor:
+    if tensor.ndim == 0:
+        return tensor.reshape(1, 1)
+    if tensor.ndim == 1:
+        return tensor.reshape(1, -1)
+    return tensor.reshape(tensor.shape[0], -1)
+
+
+def _sample_indices(count: int, limit: int) -> list[int]:
+    if count <= 0:
+        return []
+    limit = max(1, min(512, int(limit)))
+    if count <= limit:
+        return list(range(count))
+    if limit == 1:
+        return [0]
+    return sorted({round(index * (count - 1) / (limit - 1)) for index in range(limit)})
 
 
 def _artifact_dict(artifact: ModelArtifact) -> dict[str, object]:

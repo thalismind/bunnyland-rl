@@ -112,6 +112,25 @@ def install_rl_routes(app, actor: WorldActor, **_context) -> None:
             raise HTTPException(status_code=404, detail="model does not exist")
         return _model_view(model)
 
+    @app.get("/admin/rl/models/{model_id}/weights/preview")
+    async def preview_model_weights(
+        model_id: str,
+        layer: str | None = None,
+        max_rows: int = 256,
+        max_columns: int = 256,
+    ) -> dict[str, Any]:
+        try:
+            return service.preview_model_weights(
+                model_id,
+                layer_name=layer,
+                max_rows=max_rows,
+                max_columns=max_columns,
+            )
+        except ValueError as exc:
+            detail = str(exc)
+            status = 404 if "does not exist" in detail else 400
+            raise HTTPException(status_code=status, detail=detail) from exc
+
     @app.post("/admin/rl/models/{model_id}/assign")
     async def assign_model(model_id: str, request: ModelAssignRequest) -> dict[str, Any]:
         try:

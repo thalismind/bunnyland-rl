@@ -7,7 +7,7 @@ declare const process: {
   };
 };
 
-const apiProxyTarget = process.env.BUNNYLAND_API_PROXY || 'http://127.0.0.1:8765';
+const apiProxyTarget = process.env.BUNNYLAND_API_PROXY || 'http://127.0.0.1:8876';
 
 export default defineConfig({
   base: process.env.BUNNYLAND_RL_BASE || '/rl/',

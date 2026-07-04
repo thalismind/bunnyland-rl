@@ -7,4 +7,7 @@ test('dashboard source includes required admin controls', async () => {
   assert.match(source, /Models/);
   assert.match(source, /data-cancel/);
   assert.match(source, /data-assign/);
+  assert.match(source, /data-preview/);
+  assert.match(source, /data-weight-heatmap/);
+  assert.match(source, /downsampled/);
 });

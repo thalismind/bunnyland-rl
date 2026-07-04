@@ -57,7 +57,7 @@ def scenario() -> tuple[WorldActor, str]:
 def test_plugin_imports_and_contributes_ecs_and_runtime():
     plugins = load_modules(["bunnyland_rl"])
 
-    assert [plugin.id for plugin in plugins] == ["bunnyland_rl.bunnyland_rl"]
+    assert [plugin.id for plugin in plugins] == ["bunnyland.rl"]
     assert RLControllerComponent in plugins[0].ecs.components
     assert plugins[0].runtime.controller_factories
     assert plugins[0].runtime.server_routers
@@ -136,6 +136,20 @@ def test_training_job_completes_saves_and_reloads_model(tmp_path):
     weights = load_file(model.weights_path)
     assert weights
     assert model.weights_path.endswith(".safetensors")
+    preview = service.preview_model_weights(model.model_id, max_rows=6, max_columns=7)
+    assert preview["model_id"] == model.model_id
+    assert preview["layers"]
+    selected = preview["selected_layer"]
+    assert selected["name"]
+    assert selected["values"]
+    assert len(selected["values"]) <= 6
+    assert len(selected["values"][0]) <= 7
+    assert selected["min"] <= selected["mean"] <= selected["max"]
+    bias_layer = next(layer["name"] for layer in preview["layers"] if layer["name"].endswith("bias"))
+    bias_preview = service.preview_model_weights(model.model_id, layer_name=bias_layer)
+    assert bias_preview["selected_layer"]["rows"] == 1
+    with pytest.raises(ValueError, match="layer 'missing' does not exist"):
+        service.preview_model_weights(model.model_id, layer_name="missing")
 
     reloaded = RLTrainingService(actor, storage_dir=tmp_path)
     reloaded_model = reloaded.get_model(completed.model_id)
@@ -289,5 +303,6 @@ def test_admin_rl_routes_are_contributed_under_admin(monkeypatch, tmp_path):
     paths = {getattr(route, "path", "") for route in app.routes}
     assert "/admin/rl/status" in paths
     assert "/admin/rl/training/jobs" in paths
+    assert "/admin/rl/models/{model_id}/weights/preview" in paths
     assert all(path.startswith("/admin/rl") for path in paths if "/rl/" in path)
     assert character_id

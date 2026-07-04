@@ -8,7 +8,7 @@ from .api import install_rl_routes
 from .components import RLControllerComponent
 from .runtime import install_rl_runtime
 
-PLUGIN_ID = "bunnyland_rl"
+PLUGIN_ID = "bunnyland.rl"
 
 
 def plugin() -> Plugin:

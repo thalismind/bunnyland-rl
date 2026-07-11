@@ -18,6 +18,9 @@ tracking = [
     "wandb>=0.18",
 ]
 
+[project.entry-points."bunnyland.plugins"]
+"bunnyland.rl" = "bunnyland_rl.plugin:bunnyland_plugins"
+
 [dependency-groups]
 dev = [
     "pytest>=8.0",

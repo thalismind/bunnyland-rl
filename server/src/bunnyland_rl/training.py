@@ -476,10 +476,7 @@ def _layer_preview(
     row_indices = _sample_indices(row_count, max_rows)
     column_indices = _sample_indices(column_count, max_columns)
     sampled = matrix[row_indices][:, column_indices].to(torch.float32)
-    values = [
-        [round(float(value), 6) for value in row]
-        for row in sampled.tolist()
-    ]
+    values = [[round(float(value), 6) for value in row] for row in sampled.tolist()]
     stats_tensor = matrix.to(torch.float32)
     return {
         "name": name,

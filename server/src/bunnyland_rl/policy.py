@@ -11,6 +11,7 @@ from .components import PolicyNetName
 PolicyNetFactory = Callable[[int, int], object]
 POLICY_NETS: dict[str, PolicyNetFactory] = {}
 
+
 class MLPPolicyNet:
     name = "mlp"
 

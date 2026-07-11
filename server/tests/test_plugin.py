@@ -19,12 +19,13 @@ from bunnyland.core import (
     spawn_entity,
 )
 from bunnyland.llm_agents import ControllerDispatch, ScriptedAgent, ToolCall, tool_names
-from bunnyland.plugins import apply_plugins, load_modules
+from bunnyland.plugins import apply_plugins
 from bunnyland.prompts.builder import PromptBuilder
 from safetensors.torch import load_file
 
 from bunnyland_rl.components import RLControllerComponent
 from bunnyland_rl.lenses import encode_lenses
+from bunnyland_rl.plugin import bunnyland_plugins as _plugins
 from bunnyland_rl.policy import (
     DeepPolicyNet,
     MLPPolicyNet,
@@ -55,7 +56,7 @@ def scenario() -> tuple[WorldActor, str]:
 
 
 def test_plugin_imports_and_contributes_ecs_and_runtime():
-    plugins = load_modules(["bunnyland_rl"])
+    plugins = _plugins()
 
     assert [plugin.id for plugin in plugins] == ["bunnyland.rl"]
     assert RLControllerComponent in plugins[0].ecs.components
@@ -145,7 +146,9 @@ def test_training_job_completes_saves_and_reloads_model(tmp_path):
     assert len(selected["values"]) <= 6
     assert len(selected["values"][0]) <= 7
     assert selected["min"] <= selected["mean"] <= selected["max"]
-    bias_layer = next(layer["name"] for layer in preview["layers"] if layer["name"].endswith("bias"))
+    bias_layer = next(
+        layer["name"] for layer in preview["layers"] if layer["name"].endswith("bias")
+    )
     bias_preview = service.preview_model_weights(model.model_id, layer_name=bias_layer)
     assert bias_preview["selected_layer"]["rows"] == 1
     with pytest.raises(ValueError, match="layer 'missing' does not exist"):
@@ -269,7 +272,7 @@ def test_rl_dispatch_emits_normal_tool_calls():
             arguments={"direction": ActionArgument(required=True)},
         )
     )
-    apply_plugins(load_modules(["bunnyland_rl"]), actor)
+    apply_plugins(_plugins(), actor)
     character_entity = next(
         iter(actor.world.query().with_all([CharacterComponent]).execute_entities())
     )
@@ -296,7 +299,7 @@ def test_admin_rl_routes_are_contributed_under_admin(monkeypatch, tmp_path):
 
     monkeypatch.setenv("BUNNYLAND_RL_DIR", str(tmp_path))
     actor, character_id = scenario()
-    plugins = load_modules(["bunnyland_rl"])
+    plugins = _plugins()
     apply_plugins(plugins, actor)
     app = create_app(actor, plugins=plugins, admin_token="secret")
 

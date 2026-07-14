@@ -57,8 +57,10 @@ Install the `tracking` extra when you want the optional `wandb` dependency avail
 
 The web image copies the dashboard into `/usr/share/nginx/html/rl`.
 
-Open `/rl/`, set the server field to `/api` for same-origin deployments, and provide the admin
-secret. The dashboard stores the secret in browser `localStorage`.
+Open `/rl/` on the hosted Bunnyland origin and set the server field to `/api`. Sign in through
+the normal same-origin login flow; the dashboard uses the secure HttpOnly session cookie and
+does not store bearer credentials in browser storage. Browser password login is deliberately
+refused for cross-origin API URLs.
 
 The dashboard can:
 
@@ -72,7 +74,8 @@ The dashboard can:
 - preview safetensors weight layers;
 - assign a saved model to a character.
 
-Protect the dashboard and `/admin/rl/*` routes the same way you protect other admin tools.
+The `/admin/rl/*` routes require `world:admin`; serving the dashboard does not grant that
+scope.
 
 ## Start a training job
 

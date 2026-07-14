@@ -81,7 +81,8 @@ arguments so the controller component, runtime hooks, and admin routes are loade
 ## Web Dashboard
 
 The web app is a Vite dashboard served at `/rl/` in the Docker image. It talks to the
-Bunnyland admin API and stores the admin secret in browser `localStorage`.
+Bunnyland admin API using the same secure HttpOnly, same-origin login cookie as the hosted
+web client; it does not persist bearer credentials in browser storage.
 
 ```bash
 cd web
@@ -91,7 +92,7 @@ npm run dev
 
 The dashboard can:
 
-- connect to `/api` or a full Bunnyland server URL;
+- connect to the same-origin `/api` endpoint;
 - list playable characters and available base controller behaviors;
 - start offline training jobs with selected policy networks, lenses, episode counts, updates,
   and seeds;

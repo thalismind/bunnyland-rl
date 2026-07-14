@@ -301,7 +301,7 @@ def test_admin_rl_routes_are_contributed_under_admin(monkeypatch, tmp_path):
     actor, character_id = scenario()
     plugins = _plugins()
     apply_plugins(plugins, actor)
-    app = create_app(actor, plugins=plugins, admin_token="secret")
+    app = create_app(actor, plugins=plugins, allow_unauthenticated=True)
 
     paths = {getattr(route, "path", "") for route in app.routes}
     assert "/admin/rl/status" in paths

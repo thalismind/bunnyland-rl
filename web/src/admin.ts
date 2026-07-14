@@ -1,5 +1,5 @@
 import '@bunnyland/ui-web/assets/bunnyland-ui.css';
-import { normalizeBase, sendJson } from '@bunnyland/ui-web/api';
+import { login, normalizeBase, sendJson } from '@bunnyland/ui-web/api';
 import { bindThemeSelect } from '@bunnyland/ui-web/theme';
 import { escapeHtml } from '@bunnyland/ui-web/widgets';
 import './style.css';
@@ -68,7 +68,6 @@ type Character = {
 
 type State = {
   apiBase: string;
-  adminSecret: string;
   characters: Character[];
   behaviors: string[];
   jobs: Job[];
@@ -82,7 +81,6 @@ type State = {
 
 const state: State = {
   apiBase: normalizeBase(new URLSearchParams(location.search).get('server') || '/api'),
-  adminSecret: localStorage.getItem('bunnyland-admin-secret') || '',
   characters: [],
   behaviors: [],
   jobs: [],
@@ -100,10 +98,6 @@ if (!app) {
 }
 const root = app;
 
-function headers(): Record<string, string> {
-  return state.adminSecret ? { 'X-Bunnyland-Admin-Secret': state.adminSecret } : {};
-}
-
 function setApiStatus(text: string, cls: '' | 'ok' | 'err'): void {
   const status = document.getElementById('api-status');
   if (!status) {
@@ -114,7 +108,7 @@ function setApiStatus(text: string, cls: '' | 'ok' | 'err'): void {
 }
 
 async function getJson<T>(path: string): Promise<T> {
-  const response = await fetch(`${state.apiBase}${path}`, { headers: headers() });
+  const response = await fetch(`${state.apiBase}${path}`, { credentials: 'include' });
   if (!response.ok) {
     throw new Error(`${response.status} ${response.statusText} from ${state.apiBase}${path}: ${await response.text()}`);
   }
@@ -171,7 +165,6 @@ async function startJob(): Promise<void> {
       updates_per_episode: Number((document.getElementById('updates') as HTMLInputElement).value || 4),
       seed: (document.getElementById('seed') as HTMLInputElement).value,
     }),
-    headers: headers(),
     method: 'POST',
   });
   await refresh();
@@ -180,7 +173,6 @@ async function startJob(): Promise<void> {
 async function cancelJob(jobId: string): Promise<void> {
   await sendJson(state.apiBase, `/admin/rl/training/jobs/${encodeURIComponent(jobId)}/cancel`, {
     body: JSON.stringify({}),
-    headers: headers(),
     method: 'POST',
   });
   await refresh();
@@ -191,7 +183,6 @@ async function assignModel(modelId: string): Promise<void> {
   state.assignCharacter = characterId;
   await sendJson(state.apiBase, `/admin/rl/models/${encodeURIComponent(modelId)}/assign`, {
     body: JSON.stringify({ character_id: characterId }),
-    headers: headers(),
     method: 'POST',
   });
   await refresh();
@@ -423,18 +414,20 @@ function heatColor(value: number, min: number, max: number): [number, number, nu
 function initToolbar(): void {
   bindThemeSelect(document.getElementById('theme-select') as HTMLSelectElement | null);
   const apiInput = document.getElementById('api-base') as HTMLInputElement | null;
-  const secretInput = document.getElementById('admin-secret') as HTMLInputElement | null;
+  const usernameInput = document.getElementById('username') as HTMLInputElement | null;
+  const passwordInput = document.getElementById('password') as HTMLInputElement | null;
   if (apiInput) {
     apiInput.value = state.apiBase;
   }
-  if (secretInput) {
-    secretInput.value = state.adminSecret;
-  }
   document.getElementById('refresh')?.addEventListener('click', () => {
     state.apiBase = normalizeBase(apiInput?.value || '');
-    state.adminSecret = secretInput?.value || '';
-    localStorage.setItem('bunnyland-admin-secret', state.adminSecret);
-    void refresh();
+    void (async () => {
+      if (usernameInput?.value && passwordInput?.value) {
+        await login(state.apiBase, usernameInput.value, passwordInput.value);
+        passwordInput.value = '';
+      }
+      await refresh();
+    })();
   });
 }
 

@@ -16,14 +16,10 @@ When loaded, it contributes:
 
 - `RLControllerComponent` for assigned RL controller state;
 - runtime controller registration that emits normal Bunnyland `ToolCall`s;
-- `/admin/rl/status`;
-- `/admin/rl/training/jobs`;
-- `/admin/rl/training/jobs/{job_id}`;
-- `/admin/rl/training/jobs/{job_id}/cancel`;
-- `/admin/rl/models`;
-- `/admin/rl/models/{model_id}`;
-- `/admin/rl/models/{model_id}/weights/preview`;
-- `/admin/rl/models/{model_id}/assign`.
+- an admin-zoned HTTP contribution for service status, offline training jobs, saved models,
+  bounded weight inspection, and controller assignment.
+
+Consult the server OpenAPI document for concrete operations and payload schemas.
 
 Load it with the stock Bunnyland server:
 

@@ -41,7 +41,7 @@ class ModelAssignRequest(BaseModel):
     act_every_ticks: int = 1
 
 
-def install_rl_routes(app, actor: WorldActor, **_context) -> None:
+def install_rl_routes(router, actor: WorldActor, **_context) -> None:
     try:
         from fastapi import HTTPException
     except ImportError as exc:
@@ -49,7 +49,7 @@ def install_rl_routes(app, actor: WorldActor, **_context) -> None:
 
     service = training_service(actor)
 
-    @app.get("/admin/rl/status")
+    @router.get("/rl/status")
     async def rl_status() -> dict[str, Any]:
         return {
             "ok": True,
@@ -62,7 +62,7 @@ def install_rl_routes(app, actor: WorldActor, **_context) -> None:
             "wandb_enabled": wandb_enabled(),
         }
 
-    @app.post("/admin/rl/training/jobs")
+    @router.post("/rl/training/jobs")
     async def create_training_job(request: TrainingJobRequest) -> dict[str, Any]:
         try:
             job = service.create_job(
@@ -83,36 +83,36 @@ def install_rl_routes(app, actor: WorldActor, **_context) -> None:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         return _job_view(job)
 
-    @app.get("/admin/rl/training/jobs")
+    @router.get("/rl/training/jobs")
     async def list_training_jobs() -> dict[str, Any]:
         return {"jobs": [_job_view(job) for job in service.list_jobs()]}
 
-    @app.get("/admin/rl/training/jobs/{job_id}")
+    @router.get("/rl/training/jobs/{job_id}")
     async def get_training_job(job_id: str) -> dict[str, Any]:
         job = service.get_job(job_id)
         if job is None:
             raise HTTPException(status_code=404, detail="training job does not exist")
         return _job_view(job)
 
-    @app.post("/admin/rl/training/jobs/{job_id}/cancel")
+    @router.post("/rl/training/jobs/{job_id}/cancel")
     async def cancel_training_job(job_id: str) -> dict[str, Any]:
         job = service.cancel_job(job_id)
         if job is None:
             raise HTTPException(status_code=404, detail="training job does not exist")
         return _job_view(job)
 
-    @app.get("/admin/rl/models")
+    @router.get("/rl/models")
     async def list_models() -> dict[str, Any]:
         return {"models": [_model_view(model) for model in service.list_models()]}
 
-    @app.get("/admin/rl/models/{model_id}")
+    @router.get("/rl/models/{model_id}")
     async def get_model(model_id: str) -> dict[str, Any]:
         model = service.get_model(model_id)
         if model is None:
             raise HTTPException(status_code=404, detail="model does not exist")
         return _model_view(model)
 
-    @app.get("/admin/rl/models/{model_id}/weights/preview")
+    @router.get("/rl/models/{model_id}/weights/preview")
     async def preview_model_weights(
         model_id: str,
         layer: str | None = None,
@@ -131,7 +131,7 @@ def install_rl_routes(app, actor: WorldActor, **_context) -> None:
             status = 404 if "does not exist" in detail else 400
             raise HTTPException(status_code=status, detail=detail) from exc
 
-    @app.post("/admin/rl/models/{model_id}/assign")
+    @router.post("/rl/models/{model_id}/assign")
     async def assign_model(model_id: str, request: ModelAssignRequest) -> dict[str, Any]:
         try:
             result = service.assign_model(

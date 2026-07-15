@@ -2,7 +2,13 @@
 
 from __future__ import annotations
 
-from bunnyland.plugins import EcsContribution, Plugin, RuntimeContribution
+from bunnyland.plugins import (
+    EcsContribution,
+    HttpContribution,
+    HttpZone,
+    Plugin,
+    RuntimeContribution,
+)
 
 from .api import install_rl_routes
 from .components import RLControllerComponent
@@ -20,7 +26,7 @@ def plugin() -> Plugin:
         ecs=EcsContribution(components=(RLControllerComponent,)),
         runtime=RuntimeContribution(
             controller_factories=(install_rl_runtime,),
-            server_routers=(install_rl_routes,),
+            http=(HttpContribution(zone=HttpZone.ADMIN, registrars=(install_rl_routes,)),),
         ),
     )
 

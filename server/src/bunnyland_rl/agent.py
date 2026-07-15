@@ -16,7 +16,7 @@ class RLAgent:
         self.component = component
         self._fallback: BehaviorTreeAgent | None = None
 
-    def decide(
+    async def decide(
         self,
         prompt: str,
         context: PromptContext,
@@ -40,7 +40,7 @@ class RLAgent:
             if self._fallback is None:
                 tree = resolve_behavior_tree(self.component.behavior_name)
                 self._fallback = BehaviorTreeAgent(tree)
-            return self._fallback.decide(prompt, context, character_id=character_id)
+            return await self._fallback.decide(prompt, context, character_id=character_id)
         return None
 
     def _policy_decision(

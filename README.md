@@ -33,15 +33,11 @@ The plugin exposes `bunnyland_rl.bunnyland_plugins()` and contributes:
 - `RLControllerComponent` - ECS controller state for a trained or built-in RL policy.
 - RL controller runtime registration - turns assigned controller state into normal Bunnyland
   `ToolCall`s, so RL output uses the same action pipeline as other controllers.
-- `/admin/rl/status` - reports schema, world epoch, available policy networks, lenses, saved
-  models, controller component name, and W&B status.
-- `/admin/rl/training/jobs` - creates and lists offline training jobs.
-- `/admin/rl/training/jobs/{job_id}` - reads a specific job.
-- `/admin/rl/training/jobs/{job_id}/cancel` - requests cancellation for a job.
-- `/admin/rl/models` and `/admin/rl/models/{model_id}` - lists and reads saved models.
-- `/admin/rl/models/{model_id}/weights/preview` - returns a bounded preview of safetensors
-  weights for dashboard inspection.
-- `/admin/rl/models/{model_id}/assign` - assigns a trained model to a character.
+- an admin-zoned HTTP contribution for status, offline training jobs, saved models,
+  bounded weight inspection, and controller assignment.
+
+The server OpenAPI document is the canonical reference for concrete operations and payload
+schemas. Every RL operation requires `world:admin`; the static dashboard grants no scope.
 
 `default_enabled=True`, so loading the module is enough for Bunnyland to register the plugin.
 The `bunnyland_rl` package must be importable by the server, either installed into the server

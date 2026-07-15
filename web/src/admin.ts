@@ -1,5 +1,5 @@
 import '@bunnyland/ui-web/assets/bunnyland-ui.css';
-import { login, normalizeBase, sendJson } from '@bunnyland/ui-web/api';
+import { assertSameOriginBase, login, sendJson, serverFromUrl } from '@bunnyland/ui-web/api';
 import { bindThemeSelect } from '@bunnyland/ui-web/theme';
 import { escapeHtml } from '@bunnyland/ui-web/widgets';
 import './style.css';
@@ -80,7 +80,7 @@ type State = {
 };
 
 const state: State = {
-  apiBase: normalizeBase(new URLSearchParams(location.search).get('server') || '/api'),
+  apiBase: assertSameOriginBase(serverFromUrl() || '/api'),
   characters: [],
   behaviors: [],
   jobs: [],
@@ -108,7 +108,9 @@ function setApiStatus(text: string, cls: '' | 'ok' | 'err'): void {
 }
 
 async function getJson<T>(path: string): Promise<T> {
-  const response = await fetch(`${state.apiBase}${path}`, { credentials: 'include' });
+  const response = await fetch(`${assertSameOriginBase(state.apiBase)}${path}`, {
+    credentials: 'include',
+  });
   if (!response.ok) {
     throw new Error(`${response.status} ${response.statusText} from ${state.apiBase}${path}: ${await response.text()}`);
   }
@@ -118,7 +120,7 @@ async function getJson<T>(path: string): Promise<T> {
 async function refresh(): Promise<void> {
   try {
     const [characters, definitions, jobs, models] = await Promise.all([
-      getJson<{ characters: Character[] }>('/world/characters'),
+      getJson<{ characters: Character[] }>('/play/world/characters'),
       getJson<{ behaviors: string[] }>('/admin/controllers/definitions'),
       getJson<{ jobs: Job[] }>('/admin/rl/training/jobs'),
       getJson<{ models: Model[] }>('/admin/rl/models'),
@@ -306,7 +308,7 @@ function renderJobs(jobs: Job[]): string {
         <h3>${escapeHtml(job.job_id)}</h3>
         <p>${escapeHtml(job.status)} · episode ${job.metrics.episode} update ${job.metrics.update}</p>
         <p>checkpoint: ${escapeHtml(job.latest_checkpoint || '')}</p>
-        ${job.wandb_url ? `<p><a href="${escapeHtml(job.wandb_url)}">W&amp;B run</a></p>` : ''}
+        ${safeExternalUrl(job.wandb_url) ? `<p><a href="${escapeHtml(safeExternalUrl(job.wandb_url))}">W&amp;B run</a></p>` : ''}
         ${job.error ? `<p class="error">${escapeHtml(job.error)}</p>` : ''}
       </div>
       <canvas data-chart="${escapeHtml(job.job_id)}" width="220" height="80"></canvas>
@@ -328,7 +330,7 @@ function renderModels(models: Model[]): string {
         <p>artifact: ${escapeHtml(model.artifact_path)}</p>
         <p>checkpoint: ${escapeHtml(model.checkpoint_path)}</p>
         <p>weights: ${escapeHtml(model.weights_path)} (${escapeHtml(model.weights_format)})</p>
-        ${model.wandb_url ? `<p><a href="${escapeHtml(model.wandb_url)}">W&amp;B run</a></p>` : ''}
+        ${safeExternalUrl(model.wandb_url) ? `<p><a href="${escapeHtml(safeExternalUrl(model.wandb_url))}">W&amp;B run</a></p>` : ''}
       </div>
       <div class="model-actions">
         <button data-preview="${escapeHtml(model.model_id)}">Preview</button>
@@ -394,6 +396,16 @@ function formatShape(shape: number[]): string {
   return `[${shape.join(', ')}]`;
 }
 
+function safeExternalUrl(value: string | null): string {
+  if (!value) return '';
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' ? url.href : '';
+  } catch {
+    return '';
+  }
+}
+
 function formatNumber(value: number): string {
   return Number.isFinite(value) ? value.toFixed(4) : String(value);
 }
@@ -420,7 +432,7 @@ function initToolbar(): void {
     apiInput.value = state.apiBase;
   }
   document.getElementById('refresh')?.addEventListener('click', () => {
-    state.apiBase = normalizeBase(apiInput?.value || '');
+    state.apiBase = assertSameOriginBase(apiInput?.value || '');
     void (async () => {
       if (usernameInput?.value && passwordInput?.value) {
         await login(state.apiBase, usernameInput.value, passwordInput.value);

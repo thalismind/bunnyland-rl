@@ -61,7 +61,8 @@ def test_plugin_imports_and_contributes_ecs_and_runtime():
     assert [plugin.id for plugin in plugins] == ["bunnyland.rl"]
     assert RLControllerComponent in plugins[0].ecs.components
     assert plugins[0].runtime.controller_factories
-    assert plugins[0].runtime.server_routers
+    assert plugins[0].runtime.http
+    assert plugins[0].runtime.http[0].zone.value == "admin"
 
 
 def test_policy_registry_validates_and_accepts_new_policy():
@@ -256,7 +257,11 @@ def test_assignment_creates_rl_controller_and_bumps_generation(tmp_path):
     assert assigned.behavior_name == "guard"
 
 
-def test_rl_dispatch_emits_normal_tool_calls():
+def test_rl_dispatch_emits_normal_tool_calls(monkeypatch):
+    monkeypatch.setattr(
+        "bunnyland_rl.agent.stable_score",
+        lambda *parts: 1 if "move" in parts else 0,
+    )
     actor, character_id = scenario()
     actor.register_action_definition(
         ActionDefinition(
@@ -285,7 +290,12 @@ def test_rl_dispatch_emits_normal_tool_calls():
         ScriptedAgent([ToolCall("wait", {})]),
     )
 
-    decisions = asyncio.run(dispatch.run_once())
+    async def dispatch_once():
+        decisions = await dispatch.run_once()
+        decisions.extend(await dispatch.await_pending())
+        return decisions
+
+    decisions = asyncio.run(dispatch_once())
 
     assert decisions
     assert decisions[0].tool is None or decisions[0].tool in tool_names(actor.action_definitions())
@@ -301,7 +311,7 @@ def test_admin_rl_routes_are_contributed_under_admin(monkeypatch, tmp_path):
     actor, character_id = scenario()
     plugins = _plugins()
     apply_plugins(plugins, actor)
-    app = create_app(actor, plugins=plugins, allow_unauthenticated=True)
+    app = create_app(actor, plugins=plugins, allow_unauthenticated_embedding=True)
 
     paths = {getattr(route, "path", "") for route in app.routes}
     assert "/admin/rl/status" in paths

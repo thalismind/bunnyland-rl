@@ -9,6 +9,8 @@ COPY server/pyproject.toml server/README.md ./
 COPY server/src ./src
 
 RUN --mount=type=cache,id=uv-cache,target=/root/.cache/uv,sharing=locked \
+    uv add --project /app "torch>=2.3" \
+        --index pytorch-cpu=https://download.pytorch.org/whl/cpu && \
     uv add --project /app --editable ".[tracking]"
 
 FROM plugin AS test

@@ -11,7 +11,7 @@ COPY server/src ./src
 RUN --mount=type=cache,id=uv-cache,target=/root/.cache/uv,sharing=locked \
     uv add --project /app "torch>=2.3" \
         --index pytorch-cpu=https://download.pytorch.org/whl/cpu --frozen && \
-    uv add --project /app --editable ".[tracking]"
+    uv add --project /app --index-strategy unsafe-best-match --editable ".[tracking]"
 
 FROM plugin AS test
 

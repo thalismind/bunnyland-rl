@@ -18,8 +18,9 @@ FROM plugin AS test
 COPY server/tests ./tests
 RUN mkdir -p /reports
 
-CMD ["uv", "run", "--project", "/app", "--with", "pytest", "-m", "pytest", "/plugin/bunnyland-rl/tests", "--junitxml=/reports/server.xml"]
+ENTRYPOINT ["uv"]
+CMD ["run", "--project", "/app", "--with", "pytest", "-m", "pytest", "/plugin/bunnyland-rl/tests", "--junitxml=/reports/server.xml"]
 
 FROM plugin AS runtime
 
-CMD ["bunnyland", "serve", "--module", "bunnyland_rl", "--generator", "lifesim-demo", "--ticks", "0", "--api-host", "0.0.0.0", "--api-port", "8765", "--save", "/data/worlds/main.json", "--autosave-every", "20"]
+CMD ["serve", "--module", "bunnyland_rl", "--generator", "lifesim-demo", "--ticks", "0", "--api-host", "0.0.0.0", "--api-port", "8765", "--save", "/data/worlds/main.json", "--autosave-every", "20"]

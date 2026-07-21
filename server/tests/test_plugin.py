@@ -314,8 +314,9 @@ def test_admin_rl_routes_are_contributed_under_admin(monkeypatch, tmp_path):
     app = create_app(actor, plugins=plugins, allow_unauthenticated_embedding=True)
 
     paths = {getattr(route, "path", "") for route in app.routes}
-    assert "/admin/rl/status" in paths
-    assert "/admin/rl/training/jobs" in paths
-    assert "/admin/rl/models/{model_id}/weights/preview" in paths
-    assert all(path.startswith("/admin/rl") for path in paths if "/rl/" in path)
+    extension = "/v1/admin/extensions/bunnyland.rl/rl"
+    assert f"{extension}/status" in paths
+    assert f"{extension}/training/jobs" in paths
+    assert f"{extension}/models/{{model_id}}/weights/preview" in paths
+    assert all(path.startswith(extension) for path in paths if "/rl/" in path)
     assert character_id

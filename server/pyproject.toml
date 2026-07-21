@@ -3,12 +3,12 @@ name = "bunnyland-rl"
 version = "0.1.0"
 description = "Out-of-tree Bunnyland reinforcement-learning controller and admin dashboard plugin."
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.12,<3.15"
 dependencies = [
-    "bunnyland>=0.2.0",
+    "bunnyland>=1.0.0rc2,<2",
     "numpy>=2.0",
     "pydantic>=2.0",
-    "relics",
+    "relics-ecs>=0.1.1,<0.2",
     "safetensors>=0.4",
     "torch>=2.3",
 ]

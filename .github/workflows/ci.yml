@@ -36,7 +36,7 @@ jobs:
             --index-url https://pypi.org/simple \
             --index pytorch-cpu=https://download.pytorch.org/whl/cpu \
             --index-strategy unsafe-best-match \
-            "$wheel" "bunnyland[server]>=1,<2" "pytest>=8"
+            "$wheel" "bunnyland[server]>=1.0.0rc2,<2" "pytest>=8"
           "${{ runner.temp }}/artifact-test/bin/python" -c \
             'from importlib.metadata import entry_points, metadata; requirements = metadata("bunnyland-rl").get_all("Requires-Dist", []); assert any(item.startswith("bunnyland") and "<2" in item for item in requirements); assert any(item.startswith("relics-ecs") and "<0.2" in item for item in requirements); entry, = [item for item in entry_points(group="bunnyland.plugins") if item.name == "bunnyland.rl"]; assert entry.load()()'
           "${{ runner.temp }}/artifact-test/bin/python" -m pytest server/tests
